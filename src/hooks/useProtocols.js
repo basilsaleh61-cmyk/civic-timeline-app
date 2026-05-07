@@ -42,7 +42,7 @@ export function useProtocols() {
   }
 
   function addProtocol(protocol) {
-    setProtocols(prev => [...prev, { ...protocol, id: generateId() }]);
+    setProtocols(prev => [...prev, { id: generateId(), ...protocol }]);
   }
 
   function getActiveRowIds() {
