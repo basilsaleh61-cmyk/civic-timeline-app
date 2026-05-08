@@ -17,32 +17,18 @@ const QUARTER      = 15 * 60_000;
 const HOUR_MS      = 3_600_000;
 
 // ── Sky colour palette ──────────────────────────────────────
-// [hour (0–24), hex].  Values between stops are linearly
-// interpolated so the gradient blends smoothly.
+// Simple day/night stops: deep navy night, warm parchment day,
+// with brief golden transitions at dawn and dusk.
 
 export const SKY_STOPS: [number, string][] = [
-  [0,    '#0c1033'],  // midnight deep navy
-  [2,    '#090c22'],  // deepest night
-  [4,    '#0e1538'],  // pre-dawn dark indigo
-  [5,    '#1e2460'],  // indigo
-  [5.5,  '#3d3578'],  // blue-indigo horizon
-  [6,    '#6a5070'],  // dawn rose-purple
-  [6.5,  '#c07050'],  // golden dawn
-  [7,    '#e8b870'],  // warm morning amber
-  [8,    '#f0d8a5'],  // morning parchment
-  [10,   '#f0e0b5'],  // warm daytime
-  [12,   '#eedebb'],  // noon parchment
-  [15,   '#eeddbb'],  // afternoon
-  [17,   '#e8cc75'],  // late-afternoon golden
-  [18,   '#e8a050'],  // pre-sunset golden
-  [18.5, '#d47040'],  // golden-hour peak
-  [19,   '#c04028'],  // sunset orange-red
-  [19.5, '#8a2850'],  // dusk magenta
-  [20,   '#3a1858'],  // dusk purple
-  [21,   '#1c1040'],  // twilight
-  [22,   '#120c30'],  // early night
-  [23,   '#0d0c2a'],  // night
-  [24,   '#0c1033'],  // back to midnight
+  [0,    '#110e28'],  // night navy (matches sidebar)
+  [5,    '#110e28'],  // night navy
+  [6,    '#c4700a'],  // dawn gold
+  [7.5,  '#e8d5b7'],  // daytime parchment
+  [17,   '#e8d5b7'],  // daytime parchment
+  [18.5, '#c4700a'],  // dusk gold
+  [20,   '#110e28'],  // night navy
+  [24,   '#110e28'],  // night navy
 ];
 
 function parseHex6(hex: string): [number, number, number] {
@@ -314,6 +300,9 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
           onMouseMove={handleTrackMouseMove}
           onMouseLeave={handleTrackMouseLeave}
         >
+
+          {/* Layer 0: construction paper grain overlay */}
+          <div className="dial-grain" />
 
           {/* Layer 1: protocol time blocks — full-width, behind ticks */}
           {processed.filter(b => !b.isEvent).map(block => (
