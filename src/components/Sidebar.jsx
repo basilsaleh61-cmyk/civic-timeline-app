@@ -1,39 +1,16 @@
 import { useState } from "react";
-import { blockColors, eventColors } from "../theme.js";
 import OutcomeCard from "./OutcomeCard.jsx";
 import TaskPanel from "./TaskPanel.jsx";
 import OutreachPanel from "./OutreachPanel.jsx";
 import EventPanel from "./EventPanel.jsx";
 import ProtocolEditor from "./ProtocolEditor.jsx";
 
-// ── Legend metadata ──────────────────────────────────────────────────────────
-
-const BLOCK_LEGEND = [
-  { key: "deep",       label: "Deep Work" },
-  { key: "task",       label: "Task" },
-  { key: "outreach",   label: "Outreach" },
-  { key: "processing", label: "Processing" },
-  { key: "movement",   label: "Movement" },
-  { key: "protocol",   label: "Protocol" },
-  { key: "sleep",      label: "Sleep / Rest" },
-];
-
-const EVENT_LEGEND = [
-  { key: "work",       label: "Work" },
-  { key: "collab",     label: "Collab" },
-  { key: "networking", label: "Networking" },
-  { key: "music",      label: "Music" },
-  { key: "social",     label: "Social" },
-];
-
-// ── Sub-components ───────────────────────────────────────────────────────────
-
 function Divider() {
   return <div style={{ height: 1, backgroundColor: "#e8e4dd", flexShrink: 0 }} />;
 }
 
 function DateHeader() {
-  const now = new Date();
+  const now     = new Date();
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
   const date    = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
   return (
@@ -53,61 +30,10 @@ function DateHeader() {
   );
 }
 
-function BlockLegend() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#b0a898", marginBottom: "2px" }}>
-        Block Types
-      </div>
-      {BLOCK_LEGEND.map(({ key, label }) => {
-        const c = blockColors[key];
-        return (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{
-              width: 18,
-              height: 12,
-              borderRadius: "3px",
-              backgroundColor: c.bg,
-              flexShrink: 0,
-            }} />
-            <span style={{ fontSize: "12px", color: "#555" }}>{label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function EventLegend() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#b0a898", marginBottom: "2px" }}>
-        Event Categories
-      </div>
-      {EVENT_LEGEND.map(({ key, label }) => {
-        const c = eventColors[key];
-        return (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              backgroundColor: c.dot,
-              flexShrink: 0,
-            }} />
-            <span style={{ fontSize: "12px", color: "#555" }}>{label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Main component ───────────────────────────────────────────────────────────
-
 export default function Sidebar({
   outcome,
   onResolve,
+  onSetText,
   tasks,
   onCompleteTask,
   onAddTask,
@@ -132,7 +58,6 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Scrollbar style — scoped by class */}
       <style>{`
         .sidebar-scroll::-webkit-scrollbar { width: 3px; }
         .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -147,14 +72,13 @@ export default function Sidebar({
         backgroundColor: "#faf9f7",
         overflow: "hidden",
       }}>
-        {/* Fixed top: date header */}
         <DateHeader />
 
-        {/* Scrollable content */}
         <div
           className="sidebar-scroll"
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: "auto",
             padding: "14px 14px 24px",
             display: "flex",
@@ -163,10 +87,11 @@ export default function Sidebar({
           }}
         >
           <OutcomeCard
-            goal={outcome.text || "No outcome set for today."}
+            goal={outcome.text}
             carriedOver={outcome.carriedOver}
             resolved={outcome.resolved}
             onResolve={onResolve}
+            onSetText={onSetText}
           />
 
           <Divider />
@@ -196,8 +121,6 @@ export default function Sidebar({
 
           <Divider />
 
-          <BlockLegend />
-
           <button
             onClick={() => setProtoOpen(true)}
             style={{
@@ -214,10 +137,6 @@ export default function Sidebar({
           >
             Edit protocols ↗
           </button>
-
-          <Divider />
-
-          <EventLegend />
         </div>
       </div>
 
