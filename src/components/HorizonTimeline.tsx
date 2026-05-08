@@ -34,13 +34,33 @@ const SPAN_COLORS = ['#0d9488', '#7c3aed', '#dc2626', '#d97706', '#2563eb', '#16
 
 interface Range { start: Date; end: Date; }
 
-function computeRange(view: HorizonView, today: Date): Range {
+// Day bands: daytime (sunrise→sunset) highlighted on dark background (week view only)
+interface HorizonDayBand { left: number; width: number; }
+
+function computeHorizonDayBands(view: HorizonView, range: Range): HorizonDayBand[] {
+  if (view !== 'week') return [];
+  const bands: HorizonDayBand[] = [];
+  const cursor = new Date(range.start); cursor.setHours(0, 0, 0, 0);
+  while (cursor < range.end) {
+    const sunrise = new Date(cursor); sunrise.setHours(SUNRISE_H, SUNRISE_M, 0, 0);
+    const sunset  = new Date(cursor); sunset.setHours(SUNSET_H,  SUNSET_M,  0, 0);
+    const ds = new Date(Math.max(sunrise.getTime(), range.start.getTime()));
+    const de = new Date(Math.min(sunset.getTime(),  range.end.getTime()));
+    if (de > ds)
+      bands.push({ left: toPct(ds, range), width: toPct(de, range) - toPct(ds, range) });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return bands;
+}
+
+function computeRange(view: HorizonView, today: Date, now: Date = today): Range {
   const y = today.getFullYear();
   const m = today.getMonth();
   switch (view) {
     case 'week': {
-      const end = new Date(today); end.setDate(end.getDate() + 7);
-      return { start: today, end };
+      // Start from the actual current moment so LEFT EDGE = NOW
+      const end = new Date(now); end.setDate(end.getDate() + 7);
+      return { start: now, end };
     }
     case 'month': {
       const end = new Date(today); end.setMonth(end.getMonth() + 1);
@@ -128,7 +148,10 @@ function computeNotches(view: HorizonView, range: Range): Notch[] {
   }
 
   const eachHour = (fn: (d: Date) => void) => {
-    const d = new Date(start);
+    // Snap to the next full hour so ticks are always on the hour,
+    // even when the range starts mid-hour (week view starting at NOW).
+    const d = new Date(start); d.setMinutes(0, 0, 0);
+    if (d < start) d.setHours(d.getHours() + 1);
     while (d < end) { fn(new Date(d)); d.setHours(d.getHours() + 1); }
   };
 
@@ -282,10 +305,10 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   }, []);
 
-  const range      = useMemo(() => computeRange(view, today), [view, today]);
-  const notches    = useMemo(() => computeNotches(view, range), [view, range]);
-  const placed     = useMemo(() => placeSpans(spans, range), [spans, range]);
-  const nightBands = useMemo(() => computeHorizonNightBands(view, range), [view, range]);
+  const range    = useMemo(() => computeRange(view, today, now), [view, today, now]);
+  const notches  = useMemo(() => computeNotches(view, range), [view, range]);
+  const placed   = useMemo(() => placeSpans(spans, range), [spans, range]);
+  const dayBands = useMemo(() => computeHorizonDayBands(view, range), [view, range]);
   const numRows     = placed.length === 0 ? 1 : Math.max(...placed.map(s => s.row)) + 1;
   const totalHeight = AXIS_TOP + numRows * (SPAN_H + SPAN_GAP) + 8;
 
@@ -451,11 +474,11 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
         onMouseDown={handleMouseDown}
       >
 
-        {/* Night bands (week view) — rendered first so they sit behind notches/spans */}
-        {nightBands.map((band, i) => (
+        {/* Day bands (week view) — lighter overlay marks daylight hours on dark base */}
+        {dayBands.map((band, i) => (
           <div
-            key={`nb-${i}`}
-            className="ht-night-band"
+            key={`db-${i}`}
+            className="ht-day-band"
             style={{ left: `${band.left}%`, width: `${band.width}%` }}
           />
         ))}
@@ -493,13 +516,13 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
           </div>
         ))}
 
-        {/* TODAY — pinned at far-left origin */}
+        {/* Left-edge origin marker */}
         <div className="ht-today-marker">
-          <span className="ht-today-label">TODAY</span>
+          <span className="ht-today-label">{view === 'week' ? 'NOW' : 'TODAY'}</span>
         </div>
 
-        {/* NOW — current time, week view only */}
-        {view === 'week' && (
+        {/* NOW marker — floats in m/s/y views; week view starts at NOW so no float needed */}
+        {view !== 'week' && (
           <div
             className="ht-now-marker"
             style={{ left: `${toPct(now, range)}%` }}

@@ -1,13 +1,12 @@
 // ─────────────────────────────────────────────────────────────
-// RollingDayDial — fixed-perspective day view
+// RollingDayDial — cylindrical time drum
 //
-// The visible window is anchored to NOW and scaled to fill
-// the available vertical space. No scrolling — the window
-// choice determines how much runway is shown.
-//
-// Positioning is 100%-based against the visible window so no
-// pixel measurements are needed for layout. Drag conversion
-// captures the track's pixel height at mousedown.
+// The visible window is centred on NOW (9 h before, 9 h after).
+// Blocks near NOW render at full fidelity; blocks further away
+// compress and fade, implying the surface curves away from the
+// viewer. The background is a live sky-colour gradient that maps
+// time-of-day to actual sky hues — deep navy at night, warm
+// parchment through the day, golden at dusk.
 // ─────────────────────────────────────────────────────────────
 
 import { useRef, useMemo, useState } from 'react';
@@ -17,9 +16,75 @@ const MIN_DURATION = 15 * 60_000;
 const QUARTER      = 15 * 60_000;
 const HOUR_MS      = 3_600_000;
 
-// Fixed mock daylight times (MVP — replace with location/date calc later)
-const SUNRISE_H = 6,  SUNRISE_M = 15;
-const SUNSET_H  = 19, SUNSET_M  = 55;
+// ── Sky colour palette ──────────────────────────────────────
+// [hour (0–24), hex].  Values between stops are linearly
+// interpolated so the gradient blends smoothly.
+
+export const SKY_STOPS: [number, string][] = [
+  [0,    '#0c1033'],  // midnight deep navy
+  [2,    '#090c22'],  // deepest night
+  [4,    '#0e1538'],  // pre-dawn dark indigo
+  [5,    '#1e2460'],  // indigo
+  [5.5,  '#3d3578'],  // blue-indigo horizon
+  [6,    '#6a5070'],  // dawn rose-purple
+  [6.5,  '#c07050'],  // golden dawn
+  [7,    '#e8b870'],  // warm morning amber
+  [8,    '#f0d8a5'],  // morning parchment
+  [10,   '#f0e0b5'],  // warm daytime
+  [12,   '#eedebb'],  // noon parchment
+  [15,   '#eeddbb'],  // afternoon
+  [17,   '#e8cc75'],  // late-afternoon golden
+  [18,   '#e8a050'],  // pre-sunset golden
+  [18.5, '#d47040'],  // golden-hour peak
+  [19,   '#c04028'],  // sunset orange-red
+  [19.5, '#8a2850'],  // dusk magenta
+  [20,   '#3a1858'],  // dusk purple
+  [21,   '#1c1040'],  // twilight
+  [22,   '#120c30'],  // early night
+  [23,   '#0d0c2a'],  // night
+  [24,   '#0c1033'],  // back to midnight
+];
+
+function parseHex6(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+function lerpColor(c0: string, c1: string, t: number): string {
+  const [r0, g0, b0] = parseHex6(c0);
+  const [r1, g1, b1] = parseHex6(c1);
+  const r = Math.round(r0 + (r1 - r0) * t);
+  const g = Math.round(g0 + (g1 - g0) * t);
+  const b = Math.round(b0 + (b1 - b0) * t);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+export function skyColorAt(hour: number): string {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 1; i < SKY_STOPS.length; i++) {
+    if (SKY_STOPS[i][0] > h) {
+      const [t0, c0] = SKY_STOPS[i - 1];
+      const [t1, c1] = SKY_STOPS[i];
+      return lerpColor(c0, c1, (h - t0) / (t1 - t0));
+    }
+  }
+  return SKY_STOPS[SKY_STOPS.length - 1][1];
+}
+
+function computeDialSkyGradient(windowStart: Date, totalHours: number): string {
+  const stops: string[] = [];
+  const step = 0.5; // sample every 30 min for smooth blending
+  for (let h = 0; h <= totalHours; h += step) {
+    const t    = new Date(windowStart.getTime() + h * HOUR_MS);
+    const hour = t.getHours() + t.getMinutes() / 60;
+    const pct  = (h / totalHours) * 100;
+    stops.push(`${skyColorAt(hour)} ${pct.toFixed(1)}%`);
+  }
+  return `linear-gradient(to bottom, ${stops.join(', ')})`;
+}
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -28,16 +93,7 @@ function snapMs(ms: number): number {
 }
 
 export function floorToHour(d: Date): Date {
-  const r = new Date(d);
-  r.setMinutes(0, 0, 0);
-  return r;
-}
-
-export function ceilToHour(d: Date): Date {
-  const r = new Date(d);
-  if (r.getMinutes() === 0 && r.getSeconds() === 0 && r.getMilliseconds() === 0) return r;
-  r.setHours(r.getHours() + 1, 0, 0, 0);
-  return r;
+  const r = new Date(d); r.setMinutes(0, 0, 0); return r;
 }
 
 export function roundToNearest15(d: Date): Date {
@@ -45,33 +101,32 @@ export function roundToNearest15(d: Date): Date {
 }
 
 function fmtTime(d: Date): string {
-  const h   = d.getHours();
-  const m   = d.getMinutes();
-  const suf = h >= 12 ? 'pm' : 'am';
-  const h12 = h % 12 || 12;
-  return `${h12}:${m.toString().padStart(2, '0')}${suf}`;
+  const h = d.getHours(), m = d.getMinutes();
+  return `${h % 12 || 12}:${m.toString().padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`;
 }
 
 function fmtHourLabel(d: Date): string {
-  const h   = d.getHours();
-  const suf = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12} ${suf}`;
+  const h = d.getHours();
+  return `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-// Strip render-only fields; preserve protocol provenance
 function asTimeBlock(b: TimeBlock): TimeBlock {
   return {
-    id:            b.id,
-    title:         b.title,
-    start:         b.start,
-    end:           b.end,
-    type:          b.type,
-    isEvent:       b.isEvent,
-    protocolId:    b.protocolId,
-    protocolLabel: b.protocolLabel,
-    protocolColor: b.protocolColor,
+    id: b.id, title: b.title, start: b.start, end: b.end, type: b.type,
+    isEvent: b.isEvent, protocolColor: b.protocolColor,
   };
+}
+
+// ── Cylinder projection ────────────────────────────────────
+// Maps distance-from-NOW (hours) to visual scale and opacity.
+// Items at NOW = full size / full opacity; further = compressed + faded.
+
+function cylScale(distHours: number): number {
+  return Math.max(0.25, 1 - Math.min(distHours, 7) / 7 * 0.75);
+}
+
+function cylOpacity(distHours: number): number {
+  return Math.max(0.04, 1 - Math.min(distHours, 4.5) / 4.5 * 0.96);
 }
 
 // ── Drag ───────────────────────────────────────────────────
@@ -83,111 +138,40 @@ interface DragMeta {
   origStart:   Date;
   origEnd:     Date;
   startY:      number;
-  trackHeight: number; // captured at mousedown — used for Δy → Δms conversion
-  totalHours:  number; // window size at mousedown
+  trackHeight: number;
+  totalHours:  number;
 }
 
 function applyDrag(meta: DragMeta, currentY: number): { start: Date; end: Date } {
   const deltaMs = snapMs(
     ((currentY - meta.startY) / meta.trackHeight) * meta.totalHours * HOUR_MS
   );
-
-  if (meta.kind === 'move') {
-    return {
-      start: new Date(meta.origStart.getTime() + deltaMs),
-      end:   new Date(meta.origEnd.getTime()   + deltaMs),
-    };
-  }
-  if (meta.kind === 'resize-top') {
-    return {
-      start: new Date(Math.min(
-        meta.origStart.getTime() + deltaMs,
-        meta.origEnd.getTime() - MIN_DURATION
-      )),
-      end: meta.origEnd,
-    };
-  }
-  // resize-bottom
+  if (meta.kind === 'move') return {
+    start: new Date(meta.origStart.getTime() + deltaMs),
+    end:   new Date(meta.origEnd.getTime()   + deltaMs),
+  };
+  if (meta.kind === 'resize-top') return {
+    start: new Date(Math.min(meta.origStart.getTime() + deltaMs, meta.origEnd.getTime() - MIN_DURATION)),
+    end: meta.origEnd,
+  };
   return {
     start: meta.origStart,
-    end:   new Date(Math.max(
-      meta.origEnd.getTime() + deltaMs,
-      meta.origStart.getTime() + MIN_DURATION
-    )),
+    end:   new Date(Math.max(meta.origEnd.getTime() + deltaMs, meta.origStart.getTime() + MIN_DURATION)),
   };
 }
 
-// ── Day/night bands ─────────────────────────────────────────
-
-interface DayBand {
-  topPct:    number;
-  heightPct: number;
-  kind:      'night' | 'sunset';
-}
-
-function computeDayBands(windowStart: Date, totalHours: number): DayBand[] {
-  const windowMs  = totalHours * HOUR_MS;
-  const windowEnd = new Date(windowStart.getTime() + windowMs);
-  const bands: DayBand[] = [];
-
-  function toPct(ms: number) {
-    return ((ms - windowStart.getTime()) / windowMs) * 100;
-  }
-
-  const cursor = new Date(windowStart);
-  cursor.setHours(0, 0, 0, 0); // start at midnight of window's first day
-
-  while (cursor.getTime() < windowEnd.getTime()) {
-    const sunrise = new Date(cursor); sunrise.setHours(SUNRISE_H, SUNRISE_M, 0, 0);
-    const sunset  = new Date(cursor); sunset.setHours(SUNSET_H,   SUNSET_M,  0, 0);
-    const nextDay = new Date(cursor); nextDay.setDate(nextDay.getDate() + 1);
-
-    // Night before sunrise
-    const n1s = Math.max(cursor.getTime(), windowStart.getTime());
-    const n1e = Math.min(sunrise.getTime(), windowEnd.getTime());
-    if (n1e > n1s) {
-      const topPct = Math.max(toPct(n1s), 0);
-      bands.push({ topPct, heightPct: toPct(n1e) - topPct, kind: 'night' });
-    }
-
-    // Night after sunset
-    const n2s = Math.max(sunset.getTime(),   windowStart.getTime());
-    const n2e = Math.min(nextDay.getTime(),  windowEnd.getTime());
-    if (n2e > n2s) {
-      bands.push({ topPct: toPct(n2s), heightPct: toPct(n2e) - toPct(n2s), kind: 'night' });
-    }
-
-    // Sunset warm line
-    const sunMs = sunset.getTime();
-    if (sunMs > windowStart.getTime() && sunMs < windowEnd.getTime()) {
-      bands.push({ topPct: toPct(sunMs), heightPct: 0, kind: 'sunset' });
-    }
-
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return bands;
-}
-
-// ── Processed block (render-only, never persisted) ──────────
+// ── Types ───────────────────────────────────────────────────
 
 interface ProcessedBlock extends TimeBlock {
-  topPct:     number; // % from top of visible window
-  heightPct:  number; // % of visible window height
+  topPct:     number;
+  heightPct:  number;
   isConflict: boolean;
+  cScale:     number;
+  cOpacity:   number;
 }
-
-// ── Tick marker ──────────────────────────────────────────────
 
 type TickKind = 'hour' | 'half' | 'quarter';
-
-interface TickMark {
-  topPct: number;
-  time:   Date;
-  kind:   TickKind;
-}
-
-// ── Props ───────────────────────────────────────────────────
+interface TickMark { topPct: number; time: Date; kind: TickKind; }
 
 interface Props {
   blocks:   TimeBlock[];
@@ -197,142 +181,101 @@ interface Props {
 // ── Component ───────────────────────────────────────────────
 
 export function RollingDayDial({ blocks, onUpdate }: Props) {
-  // Frozen at mount — the window is anchored to session start
-  const now = useRef(new Date()).current;
-
-  // Track container ref — used to read pixel height at drag start and Y→time conversion
+  const now      = useRef(new Date()).current;
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // ── Window parameters ───────────────────────────────────
-  const offsetBefore = 2;
+  // NOW is centred: equal runway above and below.
+  const offsetBefore = 9;
   const totalHours   = 18;
   const labelEvery   = 1;
 
-  const windowStart = useMemo(
-    () => new Date(now.getTime() - offsetBefore * HOUR_MS),
-    [now, offsetBefore]
-  );
-  const windowEnd = useMemo(
-    () => new Date(windowStart.getTime() + totalHours * HOUR_MS),
-    [windowStart, totalHours]
-  );
+  const windowStart = useMemo(() => new Date(now.getTime() - offsetBefore * HOUR_MS), [now, offsetBefore]);
+  const windowEnd   = useMemo(() => new Date(windowStart.getTime() + totalHours * HOUR_MS), [windowStart, totalHours]);
 
-  // % from top of visible window for any date
   function toTrackPct(d: Date): number {
     return ((d.getTime() - windowStart.getTime()) / (totalHours * HOUR_MS)) * 100;
   }
-
-  // Convert a clientY pixel position to a Date within the window
   function yToTime(clientY: number): Date {
     const rect = trackRef.current?.getBoundingClientRect();
     if (!rect) return new Date(windowStart);
-    const pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-    return new Date(windowStart.getTime() + pct * totalHours * HOUR_MS);
+    return new Date(windowStart.getTime() + Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * totalHours * HOUR_MS);
   }
 
-  const nowPct = (offsetBefore / totalHours) * 100;
+  // Focal plane — NOW is at the vertical centre of the track.
+  const nowPct = (offsetBefore / totalHours) * 100; // = 50 %
 
-  // Keep totalHours stable in drag closures
   const totalHoursRef = useRef(totalHours);
   totalHoursRef.current = totalHours;
+
+  // ── Sky gradient background ──────────────────────────────
+  const skyGradient = useMemo(
+    () => computeDialSkyGradient(windowStart, totalHours),
+    [windowStart, totalHours]
+  );
 
   // ── Drag state ──────────────────────────────────────────
   const dragMetaRef  = useRef<DragMeta | null>(null);
   const liveBlockRef = useRef<TimeBlock | null>(null);
-  const [liveBlock, setLiveBlock] = useState<TimeBlock | null>(null);
-  const [activeId,  setActiveId ] = useState<string | null>(null);
-
-  // ── Hover state ─────────────────────────────────────────
+  const [liveBlock,   setLiveBlock  ] = useState<TimeBlock | null>(null);
+  const [activeId,    setActiveId   ] = useState<string | null>(null);
   const [hoveredTime, setHoveredTime] = useState<Date | null>(null);
 
   function startDrag(kind: DragKind, raw: TimeBlock, e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     setHoveredTime(null);
-
     const block       = asTimeBlock(raw);
     const trackHeight = trackRef.current?.getBoundingClientRect().height ?? 500;
-
-    dragMetaRef.current  = {
-      kind,
-      origStart:   block.start,
-      origEnd:     block.end,
-      startY:      e.clientY,
-      trackHeight,
-      totalHours:  totalHoursRef.current,
-    };
+    dragMetaRef.current  = { kind, origStart: block.start, origEnd: block.end, startY: e.clientY, trackHeight, totalHours: totalHoursRef.current };
     liveBlockRef.current = block;
-    setLiveBlock(block);
-    setActiveId(block.id);
+    setLiveBlock(block); setActiveId(block.id);
     document.body.classList.add('is-dragging');
-
     function onMove(ev: MouseEvent) {
-      const meta = dragMetaRef.current;
-      if (!meta) return;
+      const meta = dragMetaRef.current; if (!meta) return;
       const { start, end } = applyDrag(meta, ev.clientY);
       const updated = { ...block, start, end };
-      liveBlockRef.current = updated;
-      setLiveBlock(updated);
+      liveBlockRef.current = updated; setLiveBlock(updated);
     }
-
     function onUp() {
       document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('mouseup', onUp);
       document.body.classList.remove('is-dragging');
       if (liveBlockRef.current) onUpdate(liveBlockRef.current);
-      dragMetaRef.current  = null;
-      liveBlockRef.current = null;
-      setLiveBlock(null);
-      setActiveId(null);
+      dragMetaRef.current = null; liveBlockRef.current = null;
+      setLiveBlock(null); setActiveId(null);
     }
-
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    document.addEventListener('mouseup', onUp);
   }
-
-  // ── Track interaction ────────────────────────────────────
 
   function handleTrackMouseMove(e: React.MouseEvent) {
     if (dragMetaRef.current) return;
     setHoveredTime(roundToNearest15(yToTime(e.clientY)));
   }
+  function handleTrackMouseLeave() { setHoveredTime(null); }
 
-  function handleTrackMouseLeave() {
-    setHoveredTime(null);
-  }
-
-  // ── Merge live dragging block ────────────────────────────
   const displayBlocks = useMemo(() => {
     if (!liveBlock) return blocks;
     return blocks.map(b => b.id === liveBlock.id ? liveBlock : b);
   }, [blocks, liveBlock]);
 
-  // ── Tick markers — snapped to clean clock boundaries ─────
-  // Generate from floorToHour(windowStart) in 15-min steps so labels
-  // always land on whole/half hours, never on fractional minutes.
+  // ── Tick markers ─────────────────────────────────────────
   const tickMarkers = useMemo((): TickMark[] => {
     const ticks: TickMark[] = [];
     const cursor = floorToHour(windowStart);
-
     while (cursor.getTime() <= windowEnd.getTime() + QUARTER) {
       const topPct = ((cursor.getTime() - windowStart.getTime()) / (totalHours * HOUR_MS)) * 100;
       if (topPct > -0.5 && topPct <= 100.5) {
         const mins = cursor.getMinutes();
-        const kind: TickKind = mins === 0 ? 'hour' : mins === 30 ? 'half' : 'quarter';
-        ticks.push({ topPct, time: new Date(cursor), kind });
+        ticks.push({ topPct, time: new Date(cursor), kind: mins === 0 ? 'hour' : mins === 30 ? 'half' : 'quarter' });
       }
       cursor.setTime(cursor.getTime() + QUARTER);
     }
-
     return ticks;
   }, [windowStart, windowEnd, totalHours]);
 
-  // ── Day-boundary crossings ─────────────────────────────
   const midnights = useMemo(() => {
     const result: { topPct: number; date: Date }[] = [];
-    const cursor = new Date(windowStart);
-    cursor.setHours(0, 0, 0, 0);
-    cursor.setDate(cursor.getDate() + 1);
+    const cursor = new Date(windowStart); cursor.setHours(0, 0, 0, 0); cursor.setDate(cursor.getDate() + 1);
     while (cursor.getTime() <= windowEnd.getTime()) {
       result.push({ topPct: toTrackPct(cursor), date: new Date(cursor) });
       cursor.setDate(cursor.getDate() + 1);
@@ -340,33 +283,22 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
     return result;
   }, [windowStart, windowEnd, totalHours]);
 
-  // ── Day/night shading bands ──────────────────────────────
-  const dayBands = useMemo(
-    () => computeDayBands(windowStart, totalHours),
-    [windowStart, totalHours]
-  );
-
-  // ── Conflict detection + geometry ────────────────────────
   const protectedBlocks = useMemo(
     () => displayBlocks.filter(b => b.type === 'sleep' || b.type === 'recovery'),
     [displayBlocks]
   );
 
   const processed = useMemo<ProcessedBlock[]>(
-    () => displayBlocks.map(block => ({
-      ...block,
-      topPct:    toTrackPct(block.start),
-      heightPct: ((block.end.getTime() - block.start.getTime()) / (totalHours * HOUR_MS)) * 100,
-      isConflict:
-        block.type !== 'sleep' &&
-        block.type !== 'recovery' &&
-        protectedBlocks.some(
-          pb =>
-            block.start.getTime() < pb.end.getTime() &&
-            block.end.getTime()   > pb.start.getTime()
-        ),
-    })),
-    [displayBlocks, windowStart, totalHours, protectedBlocks]
+    () => displayBlocks.map(block => {
+      const topPct    = toTrackPct(block.start);
+      const heightPct = ((block.end.getTime() - block.start.getTime()) / (totalHours * HOUR_MS)) * 100;
+      const distHours = Math.abs((topPct + heightPct / 2) - nowPct) / 100 * totalHours;
+      const isConflict =
+        block.type !== 'sleep' && block.type !== 'recovery' &&
+        protectedBlocks.some(pb => block.start.getTime() < pb.end.getTime() && block.end.getTime() > pb.start.getTime());
+      return { ...block, topPct, heightPct, isConflict, cScale: cylScale(distHours), cOpacity: cylOpacity(distHours) };
+    }),
+    [displayBlocks, windowStart, totalHours, protectedBlocks, nowPct]
   );
 
   const hoveredPct = hoveredTime !== null ? toTrackPct(hoveredTime) : null;
@@ -374,134 +306,76 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="dial-wrapper">
-
-      {/* Fixed-perspective track — no scrolling */}
       <div className="dial-scroll">
         <div
           className="dial-track"
           ref={trackRef}
+          style={{ background: skyGradient }}
           onMouseMove={handleTrackMouseMove}
           onMouseLeave={handleTrackMouseLeave}
         >
 
-          {/* Day/night shading (rendered first = behind everything) */}
-          {dayBands.map((band, i) =>
-            band.kind === 'sunset' ? (
-              <div
-                key={`sun-${i}`}
-                className="sunset-line"
-                style={{ top: `${band.topPct}%` }}
-              />
-            ) : (
-              <div
-                key={`night-${i}`}
-                className="night-band"
-                style={{ top: `${band.topPct}%`, height: `${band.heightPct}%` }}
-              />
-            )
-          )}
-
-          {/* Tick grid — hour / half / quarter marks snapped to clean clock times */}
-          {tickMarkers.map(({ topPct, time, kind }, i) => (
-            <div
-              key={i}
-              className={`hour-row hour-tick--${kind}`}
-              style={{ top: `${topPct}%` }}
-            >
-              <span className="hour-label">
-                {kind === 'hour' && time.getHours() % labelEvery === 0
-                  ? fmtHourLabel(time)
-                  : null
-                }
-              </span>
-              <div className="hour-line" />
-            </div>
-          ))}
-
-          {/* Day boundaries */}
-          {midnights.map(({ topPct, date }) => (
-            <div key={topPct} className="midnight-row" style={{ top: `${topPct}%` }}>
-              <span className="midnight-label">
-                {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-              </span>
-              <div className="midnight-line" />
-            </div>
-          ))}
-
-          {/* NOW playhead */}
-          <div className="now-row" style={{ top: `${nowPct}%` }}>
-            <span className="now-label">NOW</span>
-            <div className="now-dot" />
-            <div className="now-line" />
-          </div>
-
-          {/* Hover time indicator */}
-          {hoveredTime && hoveredPct !== null && !liveBlock && (
-            <div className="dial-hover-row" style={{ top: `${hoveredPct}%` }}>
-              <span className="dial-hover-tooltip">{fmtTime(hoveredTime)}</span>
-            </div>
-          )}
-
-          {/* Protocol time blocks (behind ticks) */}
+          {/* Layer 1: protocol time blocks — full-width, behind ticks */}
           {processed.filter(b => !b.isEvent).map(block => (
             <div
               key={block.id}
               className={[
-                'tblock',
-                `tblock--${block.type}`,
+                'tblock', `tblock--${block.type}`,
                 block.isConflict      ? 'tblock--conflict' : '',
                 block.id === activeId ? 'tblock--active'   : '',
               ].filter(Boolean).join(' ')}
               style={{
-                top:       `${block.topPct}%`,
-                height:    `${block.heightPct}%`,
-                minHeight: 28,
+                top:             `${block.topPct}%`,
+                height:          `${block.heightPct}%`,
+                minHeight:       28,
+                transform:       block.id === activeId ? 'scaleY(1)' : `scaleY(${block.cScale})`,
+                transformOrigin: 'center center',
+                opacity:         block.id === activeId ? 1 : block.cOpacity,
               }}
               onClick={e => e.stopPropagation()}
             >
-              {/* Resize — top */}
-              <div
-                className="tblock-handle tblock-handle--top"
-                onMouseDown={e => startDrag('resize-top', block, e)}
-              />
-
-              {/* Middle: accent | body | conflict badge */}
+              <div className="tblock-handle tblock-handle--top" onMouseDown={e => startDrag('resize-top', block, e)} />
               <div className="tblock-middle">
                 <div className="tblock-accent" />
-                <div
-                  className="tblock-body"
-                  onMouseDown={e => startDrag('move', block, e)}
-                >
+                <div className="tblock-body" onMouseDown={e => startDrag('move', block, e)}>
                   <span className="tblock-title">{block.title}</span>
-                  <span className="tblock-time">
-                    {fmtTime(block.start)} – {fmtTime(block.end)}
-                  </span>
-                  {block.protocolId && block.protocolLabel && (
-                    <span
-                      className="tblock-proto-badge"
-                      style={{
-                        color:       block.protocolColor,
-                        borderColor: block.protocolColor + '50',
-                      }}
-                    >
-                      {block.protocolLabel}
-                    </span>
-                  )}
+                  <span className="tblock-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
                 </div>
-                {block.isConflict && (
-                  <span className="tblock-conflict-badge">conflict</span>
-                )}
+                {block.isConflict && <span className="tblock-conflict-badge">conflict</span>}
               </div>
-
-              {/* Resize — bottom */}
-              <div
-                className="tblock-handle tblock-handle--bottom"
-                onMouseDown={e => startDrag('resize-bottom', block, e)}
-              />
+              <div className="tblock-handle tblock-handle--bottom" onMouseDown={e => startDrag('resize-bottom', block, e)} />
             </div>
           ))}
 
-          {/* Event overlays — above tblocks and ticks, bordered */}
+          {/* Layer 2: tick grid — fully visible ±7 h from NOW, fades in outer 2 h only */}
+          {tickMarkers.map(({ topPct, time, kind }, i) => {
+            const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
+            const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
+            return (
+              <div key={i} className={`hour-row hour-tick--${kind}`} style={{ top: `${topPct}%`, opacity: op }}>
+                <span className="hour-label">
+                  {kind === 'hour' && time.getHours() % labelEvery === 0 ? fmtHourLabel(time) : null}
+                </span>
+                <div className="hour-line" />
+              </div>
+            );
+          })}
+
+          {/* Layer 2: day boundaries */}
+          {midnights.map(({ topPct, date }) => {
+            const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
+            const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
+            return (
+              <div key={topPct} className="midnight-row" style={{ top: `${topPct}%`, opacity: op }}>
+                <span className="midnight-label">
+                  {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                </span>
+                <div className="midnight-line" />
+              </div>
+            );
+          })}
+
+          {/* Layer 3: event overlays — bordered, above tblocks, cylinder-compressed */}
           {processed.filter(b => b.isEvent).map(block => (
             <div
               key={block.id}
@@ -511,15 +385,33 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
                 height:          `${block.heightPct}%`,
                 minHeight:       20,
                 borderLeftColor: block.protocolColor ?? '#7F77DD',
-                background:      (block.protocolColor ?? '#7F77DD') + '28',
+                background:      'rgba(255,255,255,0.92)',
+                transform:       `scaleY(${block.cScale})`,
+                transformOrigin: 'center center',
+                opacity:         block.cOpacity,
               }}
             >
               <span className="event-overlay-title">{block.title}</span>
-              <span className="event-overlay-time">
-                {fmtTime(block.start)} – {fmtTime(block.end)}
-              </span>
+              <span className="event-overlay-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
             </div>
           ))}
+
+          {/* Layer 4: NOW playhead — focal plane, above vignette */}
+          <div className="now-row" style={{ top: `${nowPct}%` }}>
+            <span className="now-label">NOW</span>
+            <div className="now-dot" />
+            <div className="now-line" />
+          </div>
+
+          {/* Layer 4: hover indicator */}
+          {hoveredTime && hoveredPct !== null && !liveBlock && (
+            <div className="dial-hover-row" style={{ top: `${hoveredPct}%` }}>
+              <span className="dial-hover-tooltip">{fmtTime(hoveredTime)}</span>
+            </div>
+          )}
+
+          {/* Layer 5: cylinder vignette — dark overlay at top/bottom edges */}
+          <div className="dial-vignette" />
 
         </div>
       </div>

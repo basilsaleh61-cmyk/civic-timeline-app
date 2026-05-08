@@ -189,7 +189,7 @@ function TaskItem({ t, onComplete, animating }) {
 export default function TaskPanel({ tasks, onComplete, onAdd, tlTopTaskRef }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [openSections, setOpenSections] = useState(
-    Object.fromEntries(SECTIONS.map(s => [s.key, true]))
+    Object.fromEntries(SECTIONS.map(s => [s.key, false]))
   );
   const [addingIn, setAddingIn] = useState(null);
   const [animating, setAnimating] = useState(new Set());

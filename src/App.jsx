@@ -119,10 +119,11 @@ export default function App() {
   const [spans, setSpans] = useState([]);
 
   // ── Civic state ───────────────────────────────────────────
-  const [tasks,    setTasks]    = useState(TASKS);
-  const [outreach, setOutreach] = useState(OUTREACH);
-  const [events,   setEvents]   = useState(EVENTS);
-  const [outcome,  setOutcome]  = useState(TODAY_OUTCOME);
+  const [tasks,           setTasks]          = useState(TASKS);
+  const [outreach,        setOutreach]        = useState(OUTREACH);
+  const [events,          setEvents]          = useState(EVENTS);
+  const [outcome,         setOutcome]         = useState(TODAY_OUTCOME);
+  const [tomorrowOutcome, setTomorrowOutcome] = useState({ text: "", resolved: false });
 
   const { protocols, toggleProtocol, updateProtocol, deleteProtocol, addProtocol } = useProtocols();
 
@@ -280,6 +281,14 @@ export default function App() {
     setOutcome(prev => ({ ...prev, text, resolved: false }));
   }
 
+  function handleSetTomorrowText(text) {
+    setTomorrowOutcome(prev => ({ ...prev, text, resolved: false }));
+  }
+
+  function handleResolveTomorrow() {
+    setTomorrowOutcome(prev => ({ ...prev, resolved: !prev.resolved }));
+  }
+
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="app">
@@ -291,6 +300,9 @@ export default function App() {
             outcome={outcome}
             onResolve={handleResolveOutcome}
             onSetText={handleSetOutcomeText}
+            tomorrowOutcome={tomorrowOutcome}
+            onSetTomorrowText={handleSetTomorrowText}
+            onResolveTomorrow={handleResolveTomorrow}
 
             tasks={tasks}
             onCompleteTask={handleCompleteTask}

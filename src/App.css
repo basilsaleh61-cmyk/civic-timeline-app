@@ -3,7 +3,7 @@
    bg:       #f5f3ef   surface: #eceae4
    ink-1:    #1a1a1a   ink-2:   #5a4f40
    ink-3:    #888780   ink-4:   #b0a898
-   now:      #E24B4A   accent:  #BA7517
+   now:      #C4861A   accent:  #BA7517
    ══════════════════════════════════════════════════════════ */
 
 body.is-dragging,
@@ -55,8 +55,8 @@ body.is-dragging * {
 
 .ht-outer {
   flex-shrink: 0;
-  background: #eceae4;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: #1a1a30;       /* fallback — week view overrides with sky gradient */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .ht-header {
@@ -64,14 +64,15 @@ body.is-dragging * {
   align-items: center;
   justify-content: space-between;
   padding: 5px 14px 4px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.25);
 }
 
 .ht-header-title {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #888780;
+  color: rgba(255,255,255,0.55);
   user-select: none;
 }
 
@@ -86,15 +87,15 @@ body.is-dragging * {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: #888780;
+  color: rgba(255,255,255,0.5);
   cursor: pointer;
   transition: all 0.12s;
 }
-.ht-view-btn:hover { background: rgba(0,0,0,0.05); color: #1a1a1a; }
+.ht-view-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
 .ht-view-btn--active {
-  background: rgba(0,0,0,0.08);
-  border-color: rgba(0,0,0,0.15);
-  color: #1a1a1a;
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.95);
   font-weight: 600;
 }
 
@@ -118,17 +119,18 @@ body.is-dragging * {
   left: 0; bottom: 0;
   width: 1px;
 }
-.ht-notch--hairline::before { height: 12%;  background: rgba(0,0,0,0.05); }
-.ht-notch--minor::before    { height: 25%;  background: rgba(0,0,0,0.07); }
-.ht-notch--medium::before   { height: 55%;  background: rgba(0,0,0,0.13); }
-.ht-notch--major::before    { height: 100%; background: rgba(0,0,0,0.18); }
+.ht-notch--hairline::before { height: 12%;  background: rgba(255,255,255,0.12); }
+.ht-notch--minor::before    { height: 25%;  background: rgba(255,255,255,0.18); }
+.ht-notch--medium::before   { height: 55%;  background: rgba(255,255,255,0.28); }
+.ht-notch--major::before    { height: 100%; background: rgba(255,255,255,0.40); }
 
 .ht-notch-label {
   position: absolute;
   top: 4px; left: 3px;
   font-size: 8px;
   letter-spacing: 0.04em;
-  color: #888780;
+  color: rgba(255,255,255,0.75);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   white-space: nowrap;
   user-select: none;
 }
@@ -137,6 +139,14 @@ body.is-dragging * {
   position: absolute;
   top: 0; bottom: 0;
   background: rgba(10,10,40,0.04);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ht-day-band {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: rgba(255,255,255,0.10);
   pointer-events: none;
   z-index: 0;
 }
@@ -185,7 +195,7 @@ body.is-dragging * {
   position: absolute;
   top: 0; bottom: 0; left: 0;
   width: 2px;
-  background: #E24B4A;
+  background: #C4861A;
   z-index: 5;
 }
 .ht-today-label {
@@ -194,9 +204,9 @@ body.is-dragging * {
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #E24B4A;
+  color: #C4861A;
   white-space: nowrap;
-  background: #eceae4;
+  background: transparent;
   padding: 0 3px;
   user-select: none;
   z-index: 1;
@@ -206,7 +216,7 @@ body.is-dragging * {
   position: absolute;
   top: 0; bottom: 0;
   width: 1.5px;
-  background: #E24B4A;
+  background: #C4861A;
   pointer-events: none;
   z-index: 6;
 }
@@ -216,9 +226,9 @@ body.is-dragging * {
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #E24B4A;
+  color: #C4861A;
   white-space: nowrap;
-  background: #eceae4;
+  background: transparent;
   padding: 0 3px;
   user-select: none;
 }
@@ -326,6 +336,7 @@ body.is-dragging * {
   width: 100%;
   height: 100%;
   background: #f5f3ef;
+  perspective: 900px;         /* establishes 3D context for the drum metaphor */
 }
 
 /* Day/night shading */
@@ -365,15 +376,16 @@ body.is-dragging * {
   padding-right: 10px;
   font-size: 9px;
   letter-spacing: 0.04em;
-  color: #b0a898;
+  color: rgba(255,255,255,0.75);
   user-select: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
-.hour-line { flex: 1; height: 1px; background: rgba(0,0,0,0.05); }
+.hour-line { flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
 
-.hour-tick--hour    .hour-line { background: rgba(0,0,0,0.18); }
-.hour-tick--half    .hour-line { flex: none; width: 28%; background: rgba(0,0,0,0.09); }
-.hour-tick--quarter .hour-line { flex: none; width: 12%; background: rgba(0,0,0,0.04); }
+.hour-tick--hour    .hour-line { background: rgba(255,255,255,0.30); }
+.hour-tick--half    .hour-line { flex: none; width: 28%; background: rgba(255,255,255,0.15); }
+.hour-tick--quarter .hour-line { flex: none; width: 12%; background: rgba(255,255,255,0.07); }
 
 /* ── Midnight / day-boundary rows ────────────────────────── */
 
@@ -394,11 +406,12 @@ body.is-dragging * {
   padding-right: 10px;
   font-size: 9px;
   letter-spacing: 0.03em;
-  color: #5a4f40;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
   user-select: none;
 }
 
-.midnight-line { flex: 1; height: 1px; background: rgba(0,0,0,0.18); }
+.midnight-line { flex: 1; height: 1px; background: rgba(255,255,255,0.35); }
 
 /* ── Now playhead ────────────────────────────────────────── */
 
@@ -408,7 +421,7 @@ body.is-dragging * {
   display: flex;
   align-items: center;
   pointer-events: none;
-  z-index: 10;
+  z-index: 14;              /* above the vignette (z-index 13) — focal plane is always readable */
   transform: translateY(-50%);
 }
 
@@ -420,7 +433,7 @@ body.is-dragging * {
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #E24B4A;
+  color: #C4861A;
   user-select: none;
 }
 
@@ -428,11 +441,11 @@ body.is-dragging * {
   width: 8px; height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #E24B4A;
+  background: #C4861A;
   transform: translateX(-4px);
 }
 
-.now-line { flex: 1; height: 1.5px; background: #E24B4A; }
+.now-line { flex: 1; height: 1.5px; background: #C4861A; }
 
 /* ── Hover indicator ────────────────────────────────────── */
 
@@ -440,7 +453,7 @@ body.is-dragging * {
   position: absolute;
   left: 76px; right: 0;
   height: 1px;
-  background: rgba(226,75,74,0.4);
+  background: rgba(196,134,26,0.5);
   pointer-events: none;
   z-index: 8;
 }
@@ -525,7 +538,7 @@ body.is-dragging * {
   text-overflow: ellipsis;
 }
 
-.tblock-time { font-size: 9px; color: #888780; margin-top: 1px; letter-spacing: 0.04em; }
+.tblock-time { font-size: 9px; color: rgba(255,255,255,0.6); margin-top: 1px; letter-spacing: 0.04em; }
 
 .tblock-conflict-badge {
   display: flex;
@@ -540,11 +553,11 @@ body.is-dragging * {
 
 /* ── Block type skins ───────────────────────────────────── */
 
-.tblock--routine  { --tc: #0f6e4a; background: rgba(29,158,117,0.055);  border-color: rgba(29,158,117,0.20); }
-.tblock--task     { --tc: #185FA5; background: rgba(55,138,221,0.055);  border-color: rgba(55,138,221,0.18); }
-.tblock--prep     { --tc: #712B13; background: rgba(216,90,48,0.055);   border-color: rgba(216,90,48,0.18);  }
-.tblock--recovery { --tc: #3B6D11; background: rgba(99,153,34,0.055);   border-color: rgba(99,153,34,0.18);  }
-.tblock--sleep    { --tc: #3a3a38; background: rgba(68,68,65,0.07);     border-color: rgba(68,68,65,0.18);   }
+.tblock--routine  { --tc: #0f6e4a; background: rgba(29,158,117,0.22);  border-color: rgba(29,158,117,0.40); }
+.tblock--task     { --tc: #185FA5; background: rgba(55,138,221,0.22);  border-color: rgba(55,138,221,0.35); }
+.tblock--prep     { --tc: #712B13; background: rgba(216,90,48,0.22);   border-color: rgba(216,90,48,0.35);  }
+.tblock--recovery { --tc: #3B6D11; background: rgba(99,153,34,0.22);   border-color: rgba(99,153,34,0.35);  }
+.tblock--sleep    { --tc: #3a3a38; background: rgba(68,68,65,0.28);     border-color: rgba(68,68,65,0.35);   }
 
 .tblock--conflict {
   border-color: rgba(185,28,28,0.5) !important;
@@ -670,3 +683,35 @@ body.is-dragging * {
   background: rgba(0,0,0,0.12);
   margin: 0 4px;
 }
+
+/* ══════════════════════════════════════════════════════════
+   CYLINDER VIGNETTE
+   Sits above all blocks/ticks/overlays but below the NOW
+   playhead. Creates the illusion that the time surface curves
+   away from the viewer at top and bottom.
+   ══════════════════════════════════════════════════════════ */
+
+.dial-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 13;
+
+  /* Symmetric dark overlay — NOW is centred at 50 %, so both
+     edges get the same treatment. The sky gradient behind shows
+     through in the middle; edges go dark to sell the drum curve. */
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.72)   0%,
+    rgba(0,0,0,0.38)   8%,
+    rgba(0,0,0,0.10)   18%,
+    transparent        26%,
+    transparent        74%,
+    rgba(0,0,0,0.10)   82%,
+    rgba(0,0,0,0.38)   92%,
+    rgba(0,0,0,0.72)  100%
+  );
+}
+
+/* Ensure active (dragged) block always breaks above the vignette */
+.tblock--active { z-index: 20 !important; }
