@@ -60,6 +60,24 @@ export function skyColorAt(hour: number): string {
   return SKY_STOPS[SKY_STOPS.length - 1][1];
 }
 
+function darkenToRgba(hex: string, factor: number, alpha: number): string {
+  const [r, g, b] = parseHex6(hex);
+  return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
+}
+
+function computeVignetteGradient(topColor: string, botColor: string): string {
+  return `linear-gradient(to bottom,
+    ${darkenToRgba(topColor, 0.15, 1.00)}  0%,
+    ${darkenToRgba(topColor, 0.25, 0.82)}  8%,
+    ${darkenToRgba(topColor, 0.45, 0.25)} 18%,
+    transparent 26%,
+    transparent 74%,
+    ${darkenToRgba(botColor, 0.45, 0.25)} 82%,
+    ${darkenToRgba(botColor, 0.25, 0.82)} 92%,
+    ${darkenToRgba(botColor, 0.15, 1.00)} 100%
+  )`;
+}
+
 function computeDialSkyGradient(windowStart: Date, totalHours: number): string {
   const stops: string[] = [];
   const step = 0.5; // sample every 30 min for smooth blending
@@ -199,6 +217,13 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
     [windowStart, totalHours]
   );
 
+  // ── Vignette: darken-to-edge-sky-color at top/bottom ────
+  const vignetteStyle = useMemo(() => {
+    const topH = (windowStart.getHours() + windowStart.getMinutes() / 60);
+    const botH = (windowEnd.getHours()   + windowEnd.getMinutes()   / 60);
+    return { background: computeVignetteGradient(skyColorAt(topH), skyColorAt(botH)) };
+  }, [windowStart, windowEnd]);
+
   // ── Drag state ──────────────────────────────────────────
   const dragMetaRef  = useRef<DragMeta | null>(null);
   const liveBlockRef = useRef<TimeBlock | null>(null);
@@ -317,26 +342,41 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
                 top:             `${block.topPct}%`,
                 height:          `${block.heightPct}%`,
                 minHeight:       28,
-                transform:       block.id === activeId ? 'scaleY(1)' : `scaleY(${block.cScale})`,
+                transform:       `scaleY(${block.cScale})`,
                 transformOrigin: 'center center',
-                opacity:         block.id === activeId ? 1 : block.cOpacity,
+                opacity:         block.cOpacity,
               }}
-              onClick={e => e.stopPropagation()}
             >
-              <div className="tblock-handle tblock-handle--top" onMouseDown={e => startDrag('resize-top', block, e)} />
               <div className="tblock-middle">
-                <div className="tblock-accent" />
-                <div className="tblock-body" onMouseDown={e => startDrag('move', block, e)}>
+                <div className="tblock-body">
                   <span className="tblock-title">{block.title}</span>
                   <span className="tblock-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
                 </div>
-                {block.isConflict && <span className="tblock-conflict-badge">conflict</span>}
               </div>
-              <div className="tblock-handle tblock-handle--bottom" onMouseDown={e => startDrag('resize-bottom', block, e)} />
             </div>
           ))}
 
-          {/* Layer 2: tick grid — fully visible ±7 h from NOW, fades in outer 2 h only */}
+          {/* Layer 2: event cards — opaque, behind ticks, not interactive */}
+          {processed.filter(b => b.isEvent).map(block => (
+            <div
+              key={block.id}
+              className="event-overlay"
+              style={{
+                top:             `${block.topPct}%`,
+                height:          `${block.heightPct}%`,
+                minHeight:       20,
+                borderLeftColor: block.protocolColor ?? '#7F77DD',
+                transform:       `scaleY(${block.cScale})`,
+                transformOrigin: 'center center',
+                opacity:         block.cOpacity,
+              }}
+            >
+              <span className="event-overlay-title">{block.title}</span>
+              <span className="event-overlay-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
+            </div>
+          ))}
+
+          {/* Layer 3: tick grid — fully visible ±7 h from NOW, fades in outer 2 h only */}
           {tickMarkers.map(({ topPct, time, kind }, i) => {
             const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
             const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
@@ -350,7 +390,7 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             );
           })}
 
-          {/* Layer 2: day boundaries */}
+          {/* Layer 3: day boundaries */}
           {midnights.map(({ topPct, date }) => {
             const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
             const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
@@ -364,27 +404,6 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             );
           })}
 
-          {/* Layer 3: event overlays — bordered, above tblocks, cylinder-compressed */}
-          {processed.filter(b => b.isEvent).map(block => (
-            <div
-              key={block.id}
-              className="event-overlay"
-              style={{
-                top:             `${block.topPct}%`,
-                height:          `${block.heightPct}%`,
-                minHeight:       20,
-                borderLeftColor: block.protocolColor ?? '#7F77DD',
-                background:      'rgba(255,255,255,0.92)',
-                transform:       `scaleY(${block.cScale})`,
-                transformOrigin: 'center center',
-                opacity:         block.cOpacity,
-              }}
-            >
-              <span className="event-overlay-title">{block.title}</span>
-              <span className="event-overlay-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
-            </div>
-          ))}
-
           {/* Layer 4: NOW playhead — focal plane, above vignette */}
           <div className="now-row" style={{ top: `${nowPct}%` }}>
             <span className="now-label">NOW</span>
@@ -393,14 +412,14 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
           </div>
 
           {/* Layer 4: hover indicator */}
-          {hoveredTime && hoveredPct !== null && !liveBlock && (
+          {hoveredTime && hoveredPct !== null && (
             <div className="dial-hover-row" style={{ top: `${hoveredPct}%` }}>
               <span className="dial-hover-tooltip">{fmtTime(hoveredTime)}</span>
             </div>
           )}
 
-          {/* Layer 5: cylinder vignette — dark overlay at top/bottom edges */}
-          <div className="dial-vignette" />
+          {/* Layer 5: cylinder vignette — darkens to edge sky color at top/bottom */}
+          <div className="dial-vignette" style={vignetteStyle} />
 
         </div>
       </div>

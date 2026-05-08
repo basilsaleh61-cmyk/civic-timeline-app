@@ -377,7 +377,7 @@ body.is-dragging * {
   display: flex;
   align-items: center;
   pointer-events: none;
-  z-index: 1;
+  z-index: 4;
   transform: translateY(-50%);
 }
 
@@ -407,7 +407,7 @@ body.is-dragging * {
   display: flex;
   align-items: center;
   pointer-events: none;
-  z-index: 2;
+  z-index: 5;
   transform: translateY(-50%);
 }
 
@@ -492,41 +492,28 @@ body.is-dragging * {
   padding-left: 72px;
   display: flex;
   flex-direction: column;
-  border-radius: 0;
-  border-top:    1px solid transparent;
-  border-bottom: 1px solid transparent;
-  border-left:   none;
-  border-right:  none;
   overflow: hidden;
-  z-index: 0;
-  transition: box-shadow 0.12s, filter 0.12s;
+  z-index: 2;
+  pointer-events: none;
+  /* glass effect over the sky gradient */
+  backdrop-filter: blur(7px) saturate(1.35);
+  -webkit-backdrop-filter: blur(7px) saturate(1.35);
+  border-top:    1px solid rgba(255,255,255,0.18);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-.tblock:hover { filter: brightness(0.96); }
-
-.tblock-handle {
-  flex-shrink: 0;
-  height: 6px;
-  cursor: ns-resize;
-  position: relative;
-  z-index: 1;
-}
-.tblock-handle::after {
+/* left-margin color stripe extends block hue under the tick labels */
+.tblock::before {
   content: '';
   position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: 24px; height: 2px;
-  border-radius: 1px;
-  background: rgba(0,0,0,0.2);
-  opacity: 0;
-  transition: opacity 0.12s;
+  left: 0; top: 0; bottom: 0;
+  width: 72px;
+  background: var(--tc, #888);
+  opacity: 0.38;
+  pointer-events: none;
 }
-.tblock:hover .tblock-handle::after { opacity: 1; }
 
 .tblock-middle { flex: 1; display: flex; align-items: stretch; min-height: 0; overflow: hidden; }
-
-.tblock-accent { width: 3px; flex-shrink: 0; background: var(--tc, #888); }
 
 .tblock-body {
   flex: 1;
@@ -536,9 +523,7 @@ body.is-dragging * {
   justify-content: center;
   min-width: 0;
   overflow: hidden;
-  cursor: grab;
 }
-.tblock-body:active { cursor: grabbing; }
 
 .tblock-title {
   font-size: 11px;
@@ -565,41 +550,12 @@ body.is-dragging * {
 
 /* ── Block type skins ───────────────────────────────────── */
 
-.tblock--routine  { --tc: #0f6e4a; background: rgba(29,158,117,0.22);  border-color: rgba(29,158,117,0.40); }
-.tblock--task     { --tc: #185FA5; background: rgba(55,138,221,0.22);  border-color: rgba(55,138,221,0.35); }
-.tblock--prep     { --tc: #712B13; background: rgba(216,90,48,0.22);   border-color: rgba(216,90,48,0.35);  }
-.tblock--recovery { --tc: #3B6D11; background: rgba(99,153,34,0.22);   border-color: rgba(99,153,34,0.35);  }
-.tblock--sleep    { --tc: #3a3a38; background: rgba(68,68,65,0.28);     border-color: rgba(68,68,65,0.35);   }
+.tblock--routine  { --tc: #1d9e75; background: rgba(29,158,117,0.16); }
+.tblock--task     { --tc: #377ADD; background: rgba(55,138,221,0.16); }
+.tblock--prep     { --tc: #D85A30; background: rgba(216,90,48,0.16);  }
+.tblock--recovery { --tc: #639922; background: rgba(99,153,34,0.16);  }
+.tblock--sleep    { --tc: #444441; background: rgba(68,68,65,0.22);   }
 
-.tblock--conflict {
-  border-color: rgba(185,28,28,0.5) !important;
-  background:   rgba(185,28,28,0.07) !important;
-  animation: conflict-pulse 2.2s ease-in-out infinite;
-}
-.tblock--conflict .tblock-accent { background: #b91c1c !important; }
-.tblock--conflict .tblock-title  { color:      #b91c1c !important; }
-
-@keyframes conflict-pulse {
-  0%,  100% { box-shadow: none; }
-  50%        { box-shadow: 0 0 8px 2px rgba(185,28,28,0.18); }
-}
-
-.tblock--active { z-index: 20 !important; box-shadow: 0 4px 18px rgba(0,0,0,0.18); filter: brightness(0.97); }
-
-.tblock-proto-badge {
-  display: inline-block;
-  font-size: 8px;
-  letter-spacing: 0.05em;
-  padding: 1px 4px;
-  margin-top: 2px;
-  border-radius: 2px;
-  border: 1px solid;
-  opacity: 0.7;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
 
 /* ══════════════════════════════════════════════════════════
    EVENT OVERLAYS
@@ -609,17 +565,19 @@ body.is-dragging * {
   position: absolute;
   left: 76px; right: 8px;
   border-left: 3px solid;
-  border-top:    1px solid rgba(0,0,0,0.08);
+  border-top:    1px solid rgba(0,0,0,0.10);
   border-right:  1px solid rgba(0,0,0,0.08);
   border-bottom: 1px solid rgba(0,0,0,0.08);
-  border-radius: 0 3px 3px 0;
-  z-index: 8;
+  border-radius: 0 4px 4px 0;
+  z-index: 3;                    /* above tblocks (2), below ticks (4) */
+  background: rgba(255,255,255,0.93);
   overflow: hidden;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 3px 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
 }
 
 .event-overlay-title {
@@ -708,22 +666,6 @@ body.is-dragging * {
   inset: 0;
   pointer-events: none;
   z-index: 13;
-
-  /* Symmetric dark overlay — NOW is centred at 50 %, so both
-     edges get the same treatment. The sky gradient behind shows
-     through in the middle; edges go dark to sell the drum curve. */
-  background: linear-gradient(
-    to bottom,
-    rgba(0,0,0,0.72)   0%,
-    rgba(0,0,0,0.38)   8%,
-    rgba(0,0,0,0.10)   18%,
-    transparent        26%,
-    transparent        74%,
-    rgba(0,0,0,0.10)   82%,
-    rgba(0,0,0,0.38)   92%,
-    rgba(0,0,0,0.72)  100%
-  );
+  /* background is set inline — darkened to match edge sky color */
 }
 
-/* Ensure active (dragged) block always breaks above the vignette */
-.tblock--active { z-index: 20 !important; }
