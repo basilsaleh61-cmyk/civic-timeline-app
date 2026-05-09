@@ -203,9 +203,19 @@ export default function App() {
     });
   }
 
-  // ── Horizon handler ───────────────────────────────────────
+  // ── Horizon handlers ─────────────────────────────────────
   function addSpan(span) {
     setSpans(prev => [...prev, span]);
+  }
+
+  function handleUpdateEventTime(blockId, start, end) {
+    const originalId = blockId.replace(/^evt-/, '');
+    const hh = String(start.getHours()).padStart(2, '0');
+    const mm = String(start.getMinutes()).padStart(2, '0');
+    const duration = Math.round((end.getTime() - start.getTime()) / 60_000);
+    setEvents(prev => prev.map(e =>
+      e.id === originalId ? { ...e, time: `${hh}:${mm}`, duration } : e
+    ));
   }
 
   // ── Task handlers ─────────────────────────────────────────
@@ -292,7 +302,7 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="app">
-      <HorizonTimeline spans={spans} onAddSpan={addSpan} eventBars={horizonEventBars} />
+      <HorizonTimeline spans={spans} onAddSpan={addSpan} blocks={blocks} onUpdateEventTime={handleUpdateEventTime} />
 
       <div className="app-body">
         <div className="app-dial">

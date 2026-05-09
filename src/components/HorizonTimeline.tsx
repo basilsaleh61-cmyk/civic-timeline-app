@@ -12,14 +12,25 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import type { HorizonSpan } from '../types';
+import type { HorizonSpan, TimeBlock } from '../types';
 import { skyColorAt } from './RollingDayDial';
 
 type HorizonView = 'week' | 'month' | 'season' | 'year';
 type NotchLevel  = 'hairline' | 'minor' | 'medium' | 'major';
 
-const SPAN_H   = 20;
-const SPAN_GAP = 4;
+const SPAN_H  = 20;
+const SPAN_GAP =  4;
+const EVT_H   = 18;  // event bar height in the fixed band
+const PROTO_H  =  8;  // protocol strip height (below events)
+const BAND_H   = EVT_H + PROTO_H; // total fixed band below ticks
+
+const BLOCK_COLORS: Record<string, string> = {
+  routine:  '#1d9e75',
+  task:     '#377ADD',
+  prep:     '#D85A30',
+  recovery: '#639922',
+  sleep:    '#444441',
+};
 const AXIS_TOP = 26;   // px above spans reserved for notch labels
 const DAY_MS   = 86_400_000;
 const HOUR_MS  =  3_600_000;
@@ -225,6 +236,7 @@ interface PlacedSpan extends HorizonSpan {
   row:      number;
 }
 
+
 function placeSpans(spans: HorizonSpan[], range: Range): PlacedSpan[] {
   const today    = range.start;
   const rangeEnd = range.end;
@@ -290,21 +302,14 @@ interface FormState {
   color:     string;
 }
 
-interface EventBar {
-  id:    string;
-  title: string;
-  start: Date;
-  end:   Date;
-  color: string;
-}
-
 interface Props {
-  spans:      HorizonSpan[];
-  onAddSpan:  (span: HorizonSpan) => void;
-  eventBars?: EventBar[];
+  spans:               HorizonSpan[];
+  onAddSpan:           (span: HorizonSpan) => void;
+  blocks?:             TimeBlock[];
+  onUpdateEventTime?:  (id: string, start: Date, end: Date) => void;
 }
 
-export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
+export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTime }: Props) {
   const [view, setView] = useState<HorizonView>('month');
   const [now,  setNow ] = useState(() => new Date());
 
@@ -321,8 +326,46 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
   const notches  = useMemo(() => computeNotches(view, range), [view, range]);
   const placed   = useMemo(() => placeSpans(spans, range), [spans, range]);
   const dayBands = useMemo(() => computeHorizonDayBands(view, range), [view, range]);
-  const numRows     = placed.length === 0 ? 1 : Math.max(...placed.map(s => s.row)) + 1;
-  const totalHeight = AXIS_TOP + numRows * (SPAN_H + SPAN_GAP) + 8;
+  // Protocol strips — non-event blocks projected across every day in the week window
+  const protoStrips = useMemo(() => {
+    if (view !== 'week') return [];
+    const result: Array<{ id: string; color: string; leftPct: number; widthPct: number }> = [];
+    const cursor = new Date(range.start); cursor.setHours(0, 0, 0, 0);
+    while (cursor < range.end) {
+      for (const b of blocks.filter(b => !b.isEvent)) {
+        const durMs = b.end.getTime() - b.start.getTime();
+        const s = new Date(cursor);
+        s.setHours(b.start.getHours(), b.start.getMinutes(), 0, 0);
+        const e = new Date(s.getTime() + durMs);
+        if (e > range.start && s < range.end) {
+          const leftPct  = Math.max(0,   toPct(s, range));
+          const rightPct = Math.min(100, toPct(e, range));
+          result.push({
+            id:       `${b.id}-${cursor.getDate()}`,
+            color:    BLOCK_COLORS[b.type] ?? '#888',
+            leftPct,
+            widthPct: Math.max(rightPct - leftPct, 0.1),
+          });
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return result;
+  }, [blocks, range, view]);
+
+  // Event bars — isEvent blocks, with live-drag override
+  const placedEventBars = useMemo(() => {
+    return blocks
+      .filter(b => b.isEvent && b.end > range.start && b.start < range.end)
+      .map(b => {
+        const leftPct  = Math.max(0,   toPct(b.start, range));
+        const rightPct = Math.min(100, toPct(b.end,   range));
+        return { ...b, color: b.protocolColor ?? '#7F77DD', leftPct, widthPct: Math.max(rightPct - leftPct, 0.3) };
+      });
+  }, [blocks, range]);
+
+  const numSpanRows = placed.length === 0 ? 0 : Math.max(...placed.map(s => s.row)) + 1;
+  const totalHeight = AXIS_TOP + BAND_H + (numSpanRows > 0 ? numSpanRows * (SPAN_H + SPAN_GAP) + 8 : 8);
 
   // ── Refs ────────────────────────────────────────────────
   const rulerRef     = useRef<HTMLDivElement>(null);
@@ -341,6 +384,50 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
   const [form,        setForm       ] = useState<FormState>({
     title: '', startDate: '', endDate: '', color: SPAN_COLORS[0],
   });
+
+  // ── Event bar drag state ────────────────────────────────
+  const [activeEvtId, setActiveEvtId] = useState<string | null>(null);
+  const [liveEvt,     setLiveEvt    ] = useState<{ id: string; start: Date; end: Date } | null>(null);
+  const liveEvtRef = useRef<typeof liveEvt>(null);
+
+  const displayEventBars = useMemo(() => placedEventBars.map(b => {
+    if (!liveEvt || b.id !== liveEvt.id) return b;
+    const leftPct  = Math.max(0,   toPct(liveEvt.start, range));
+    const rightPct = Math.min(100, toPct(liveEvt.end,   range));
+    return { ...b, start: liveEvt.start, end: liveEvt.end, leftPct, widthPct: Math.max(rightPct - leftPct, 0.3) };
+  }), [placedEventBars, liveEvt, range]);
+
+  function startEventDrag(kind: 'move' | 'resize-left' | 'resize-right', bar: typeof placedEventBars[0], e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    const rect = rulerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const rangeMs  = range.end.getTime() - range.start.getTime();
+    const origStart = bar.start, origEnd = bar.end;
+    const startX    = e.clientX;
+    const SNAP      = 15 * 60_000;
+    setActiveEvtId(bar.id);
+    document.body.classList.add('is-dragging');
+    function onMove(ev: MouseEvent) {
+      const deltaPct = (ev.clientX - startX) / rect.width * 100;
+      const deltaMs  = Math.round(deltaPct / 100 * rangeMs / SNAP) * SNAP;
+      let ns = origStart, ne = origEnd;
+      if (kind === 'move') { ns = new Date(origStart.getTime() + deltaMs); ne = new Date(origEnd.getTime() + deltaMs); }
+      else if (kind === 'resize-left')  ns = new Date(Math.min(origStart.getTime() + deltaMs, origEnd.getTime() - SNAP));
+      else                              ne = new Date(Math.max(origEnd.getTime() + deltaMs, origStart.getTime() + SNAP));
+      const live = { id: bar.id, start: ns, end: ne };
+      liveEvtRef.current = live; setLiveEvt(live);
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.classList.remove('is-dragging');
+      setActiveEvtId(null);
+      if (liveEvtRef.current) onUpdateEventTime?.(bar.id, liveEvtRef.current.start, liveEvtRef.current.end);
+      liveEvtRef.current = null; setLiveEvt(null);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
 
   // ── x-position → view-aware snapped time unit ───────────
   // Week view snaps to the nearest hour; all other views snap to
@@ -495,27 +582,41 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
           />
         ))}
 
-        {/* Event bars (week view) — full-height bold colored columns */}
-        {view === 'week' && eventBars.map(bar => {
-          const leftPct  = toPct(bar.start, range);
-          const rightPct = toPct(bar.end,   range);
-          if (rightPct < 0 || leftPct > 100) return null;
-          const clampedLeft  = Math.max(0,   leftPct);
-          const clampedRight = Math.min(100, rightPct);
-          return (
-            <div
-              key={bar.id}
-              className="ht-event-bar"
-              style={{
-                left:        `${clampedLeft}%`,
-                width:       `${clampedRight - clampedLeft}%`,
-                borderColor: bar.color,
-                background:  bar.color + '55',
-              }}
-              title={bar.title}
-            />
-          );
-        })}
+        {/* Protocol strips — week view only, translucent, at the base of the band */}
+        {protoStrips.map(s => (
+          <div
+            key={s.id}
+            className="ht-proto-strip"
+            style={{
+              left:       `${s.leftPct}%`,
+              width:      `${s.widthPct}%`,
+              top:        AXIS_TOP + EVT_H,
+              height:     PROTO_H,
+              background: s.color + '55',
+            }}
+          />
+        ))}
+
+        {/* Event bars — opaque, sit above protocol strips, draggable */}
+        {displayEventBars.map(bar => (
+          <div
+            key={bar.id}
+            className={`ht-event-bar${bar.id === activeEvtId ? ' ht-event-bar--active' : ''}`}
+            style={{
+              left:       `${bar.leftPct}%`,
+              width:      `${bar.widthPct}%`,
+              top:        AXIS_TOP,
+              height:     EVT_H,
+              background: bar.color,
+            }}
+            title={bar.title}
+            onMouseDown={ev => startEventDrag('move', bar, ev)}
+          >
+            <div className="ht-evtbar-handle ht-evtbar-handle--l" onMouseDown={ev => startEventDrag('resize-left',  bar, ev)} />
+            <span className="ht-evtbar-label">{bar.title}</span>
+            <div className="ht-evtbar-handle ht-evtbar-handle--r" onMouseDown={ev => startEventDrag('resize-right', bar, ev)} />
+          </div>
+        ))}
 
         {/* Notch ticks + labels */}
         {notches.map((n, i) => (
@@ -589,7 +690,7 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
             style={{
               left:        `${span.leftPct}%`,
               width:       `${span.widthPct}%`,
-              top:         AXIS_TOP + span.row * (SPAN_H + SPAN_GAP),
+              top:         AXIS_TOP + BAND_H + span.row * (SPAN_H + SPAN_GAP),
               height:      SPAN_H,
               borderColor: span.color,
               background:  span.color + '18',
