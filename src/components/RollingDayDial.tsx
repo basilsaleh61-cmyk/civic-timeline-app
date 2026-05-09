@@ -16,33 +16,18 @@ const MIN_DURATION = 15 * 60_000;
 const QUARTER      = 15 * 60_000;
 const HOUR_MS      = 3_600_000;
 
-// ── Stepped sky palette ──────────────────────────────────────
-// Colors switch at 15-min tick boundaries (hard-edged bands).
-// Sunrise 6:00–7:00, sunset 18:00–19:00; rest is flat day/night.
+// ── Two-tone sky palette ─────────────────────────────────────
+// Day (6:00–18:00): warm parchment. Night (18:00–6:00): muted parchment.
 
 const SUNRISE_H = 6;
 const SUNSET_H  = 18;
 
-const DAY_COLOR   = '#F4EBD8';
-const NIGHT_COLOR = '#342447';
-
-// day → golden → dusk → night  (one entry per 15-min band)
-const SUNSET_BANDS  = ['#F4EBD8', '#C88F5A', '#9B6C87', '#342447'];
-// night → dusk → golden → day
-const SUNRISE_BANDS = ['#342447', '#9B6C87', '#C88F5A', '#F4EBD8'];
+export const DAY_COLOR   = '#F4EBD8';
+export const NIGHT_COLOR = '#DDD1BC';
 
 export function skyColorAt(hour: number): string {
-  const h    = ((hour % 24) + 24) % 24;
-  const mins = h * 60;
-  const sunriseMins = SUNRISE_H * 60; // 360
-  const sunsetMins  = SUNSET_H  * 60; // 1080
-
-  if (mins >= sunriseMins && mins < sunriseMins + 60)
-    return SUNRISE_BANDS[Math.min(Math.floor((mins - sunriseMins) / 15), 3)];
-  if (mins >= sunriseMins + 60 && mins < sunsetMins) return DAY_COLOR;
-  if (mins >= sunsetMins && mins < sunsetMins + 60)
-    return SUNSET_BANDS[Math.min(Math.floor((mins - sunsetMins) / 15), 3)];
-  return NIGHT_COLOR;
+  const h = ((hour % 24) + 24) % 24;
+  return (h >= SUNRISE_H && h < SUNSET_H) ? DAY_COLOR : NIGHT_COLOR;
 }
 
 // ── Stepped dial gradient ─────────────────────────────────

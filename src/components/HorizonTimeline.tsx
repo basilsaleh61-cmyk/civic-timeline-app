@@ -40,7 +40,7 @@ interface HorizonDayBand { left: number; width: number; color: string; }
 
 function computeHorizonDayBands(view: HorizonView, range: Range): HorizonDayBand[] {
   if (view !== 'week') return [];
-  const NIGHT    = '#342447';
+  const NIGHT    = '#DDD1BC';
   const STEP_MS  = 15 * 60_000;
   const totalMs  = range.end.getTime() - range.start.getTime();
   const snapBase = Math.floor(range.start.getTime() / STEP_MS) * STEP_MS;
@@ -52,7 +52,7 @@ function computeHorizonDayBands(view: HorizonView, range: Range): HorizonDayBand
   for (let t = snapBase; t < range.end.getTime(); t += STEP_MS) {
     const d     = new Date(t);
     const color = skyColorAt(d.getHours() + d.getMinutes() / 60);
-    if (color === NIGHT) { prevColor = ''; continue; }
+    if (color === '#DDD1BC') { prevColor = ''; continue; }
     const startPct = Math.max(0,   (t           - range.start.getTime()) / totalMs * 100);
     const endPct   = Math.min(100, (t + STEP_MS - range.start.getTime()) / totalMs * 100);
     if (color !== prevColor) {

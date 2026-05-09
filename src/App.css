@@ -55,8 +55,8 @@ body.is-dragging * {
 
 .ht-outer {
   flex-shrink: 0;
-  background: #342447;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  background: #DDD1BC;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .ht-header {
@@ -64,15 +64,15 @@ body.is-dragging * {
   align-items: center;
   justify-content: space-between;
   padding: 5px 14px 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.05);
 }
 
 .ht-header-title {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.45);
   user-select: none;
 }
 
@@ -87,15 +87,15 @@ body.is-dragging * {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(0,0,0,0.45);
   cursor: pointer;
   transition: all 0.12s;
 }
-.ht-view-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+.ht-view-btn:hover { background: rgba(0,0,0,0.07); color: rgba(0,0,0,0.80); }
 .ht-view-btn--active {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.22);
-  color: rgba(255,255,255,0.95);
+  background: rgba(0,0,0,0.09);
+  border-color: rgba(0,0,0,0.20);
+  color: rgba(0,0,0,0.90);
   font-weight: 600;
 }
 
@@ -119,18 +119,17 @@ body.is-dragging * {
   left: 0; bottom: 0;
   width: 1px;
 }
-.ht-notch--hairline::before { height: 12%;  background: rgba(255,255,255,0.12); }
-.ht-notch--minor::before    { height: 25%;  background: rgba(255,255,255,0.18); }
-.ht-notch--medium::before   { height: 55%;  background: rgba(255,255,255,0.28); }
-.ht-notch--major::before    { height: 100%; background: rgba(255,255,255,0.40); }
+.ht-notch--hairline::before { height: 12%;  background: rgba(0,0,0,0.15); }
+.ht-notch--minor::before    { height: 25%;  background: rgba(0,0,0,0.22); }
+.ht-notch--medium::before   { height: 55%;  background: rgba(0,0,0,0.32); }
+.ht-notch--major::before    { height: 100%; background: rgba(0,0,0,0.45); }
 
 .ht-notch-label {
   position: absolute;
   top: 4px; left: 3px;
   font-size: 8px;
   letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.75);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  color: rgba(0,0,0,0.60);
   white-space: nowrap;
   user-select: none;
 }
@@ -389,16 +388,15 @@ body.is-dragging * {
   padding-right: 10px;
   font-size: 9px;
   letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.75);
+  color: rgba(0,0,0,0.55);
   user-select: none;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
-.hour-line { flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
+.hour-line { flex: 1; height: 1px; background: rgba(0,0,0,0.12); }
 
-.hour-tick--hour    .hour-line { background: rgba(255,255,255,0.30); }
-.hour-tick--half    .hour-line { flex: none; width: 28%; background: rgba(255,255,255,0.15); }
-.hour-tick--quarter .hour-line { flex: none; width: 12%; background: rgba(255,255,255,0.07); }
+.hour-tick--hour    .hour-line { background: rgba(0,0,0,0.28); }
+.hour-tick--half    .hour-line { flex: none; width: 28%; background: rgba(0,0,0,0.14); }
+.hour-tick--quarter .hour-line { flex: none; width: 12%; background: rgba(0,0,0,0.07); }
 
 /* ── Midnight / day-boundary rows ────────────────────────── */
 
@@ -419,12 +417,11 @@ body.is-dragging * {
   padding-right: 10px;
   font-size: 9px;
   letter-spacing: 0.03em;
-  color: rgba(255,255,255,0.85);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  color: rgba(0,0,0,0.65);
   user-select: none;
 }
 
-.midnight-line { flex: 1; height: 1px; background: rgba(255,255,255,0.35); }
+.midnight-line { flex: 1; height: 1px; background: rgba(0,0,0,0.30); }
 
 /* ── Now playhead ────────────────────────────────────────── */
 
