@@ -55,8 +55,8 @@ body.is-dragging * {
 
 .ht-outer {
   flex-shrink: 0;
-  background: #342447;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  background: #f5f3ef;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .ht-header {
@@ -64,15 +64,15 @@ body.is-dragging * {
   align-items: center;
   justify-content: space-between;
   padding: 5px 14px 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.04);
 }
 
 .ht-header-title {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.40);
   user-select: none;
 }
 
@@ -87,15 +87,15 @@ body.is-dragging * {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(0,0,0,0.40);
   cursor: pointer;
   transition: all 0.12s;
 }
-.ht-view-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+.ht-view-btn:hover { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.75); }
 .ht-view-btn--active {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.22);
-  color: rgba(255,255,255,0.95);
+  background: rgba(0,0,0,0.08);
+  border-color: rgba(0,0,0,0.18);
+  color: rgba(0,0,0,0.85);
   font-weight: 600;
 }
 
@@ -145,6 +145,7 @@ body.is-dragging * {
 .ht-day-band {
   position: absolute;
   top: 0; bottom: 0;
+  background: rgba(255,255,255,0.45);
   pointer-events: none;
   z-index: 0;
 }

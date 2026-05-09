@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { eventColors, urgencyColors } from "../theme.js";
 
 const amber = urgencyColors.warn;
@@ -63,6 +63,11 @@ function InlineAddRow({ sectionKey, onAdd, onCancel }) {
   const [time,     setTime]     = useState("");
   const [date,     setDate]     = useState(sectionKey === "today" ? todayISO() : "");
   const [category, setCategory] = useState("work");
+  const rowRef = useRef(null);
+
+  useEffect(() => {
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   function submit() {
     if (!name.trim()) return;
@@ -71,7 +76,7 @@ function InlineAddRow({ sectionKey, onAdd, onCancel }) {
   }
 
   return (
-    <div style={{ padding: "8px 4px", display: "flex", flexDirection: "column", gap: "6px" }}>
+    <div ref={rowRef} style={{ padding: "8px 4px", display: "flex", flexDirection: "column", gap: "6px" }}>
       <input
         autoFocus
         value={name}

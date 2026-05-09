@@ -178,8 +178,8 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
   const now      = useRef(new Date()).current;
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // NOW sits ~17% from top: 3 h of past, 15 h of future.
-  const offsetBefore = 3;
+  // NOW centred: 9 h before, 9 h after.
+  const offsetBefore = 9;
   const totalHours   = 18;
   const labelEvery   = 1;
 

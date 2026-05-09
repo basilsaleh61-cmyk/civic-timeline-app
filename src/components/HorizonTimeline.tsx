@@ -13,7 +13,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { HorizonSpan } from '../types';
-import { skyColorAt } from './RollingDayDial';
 
 type HorizonView = 'week' | 'month' | 'season' | 'year';
 type NotchLevel  = 'hairline' | 'minor' | 'medium' | 'major';
@@ -36,34 +35,22 @@ const SPAN_COLORS = ['#0d9488', '#7c3aed', '#dc2626', '#d97706', '#2563eb', '#16
 interface Range { start: Date; end: Date; }
 
 // Day bands: daytime (sunrise→sunset) highlighted on dark background (week view only)
-interface HorizonDayBand { left: number; width: number; color: string; }
+interface HorizonDayBand { left: number; width: number; }
 
 function computeHorizonDayBands(view: HorizonView, range: Range): HorizonDayBand[] {
   if (view !== 'week') return [];
-  const NIGHT    = '#342447';
-  const STEP_MS  = 15 * 60_000;
-  const totalMs  = range.end.getTime() - range.start.getTime();
-  const snapBase = Math.floor(range.start.getTime() / STEP_MS) * STEP_MS;
-
-  interface RawBand { color: string; start: number; end: number; }
-  const raw: RawBand[] = [];
-  let prevColor = '';
-
-  for (let t = snapBase; t < range.end.getTime(); t += STEP_MS) {
-    const d     = new Date(t);
-    const color = skyColorAt(d.getHours() + d.getMinutes() / 60);
-    if (color === NIGHT) { prevColor = ''; continue; }
-    const startPct = Math.max(0,   (t            - range.start.getTime()) / totalMs * 100);
-    const endPct   = Math.min(100, (t + STEP_MS  - range.start.getTime()) / totalMs * 100);
-    if (color !== prevColor) {
-      raw.push({ color, start: startPct, end: endPct });
-    } else if (raw.length > 0) {
-      raw[raw.length - 1].end = endPct;
-    }
-    prevColor = color;
+  const bands: HorizonDayBand[] = [];
+  const cursor = new Date(range.start); cursor.setHours(0, 0, 0, 0);
+  while (cursor < range.end) {
+    const sunrise = new Date(cursor); sunrise.setHours(SUNRISE_H, SUNRISE_M, 0, 0);
+    const sunset  = new Date(cursor); sunset.setHours(SUNSET_H,  SUNSET_M,  0, 0);
+    const ds = new Date(Math.max(sunrise.getTime(), range.start.getTime()));
+    const de = new Date(Math.min(sunset.getTime(),  range.end.getTime()));
+    if (de > ds)
+      bands.push({ left: toPct(ds, range), width: toPct(de, range) - toPct(ds, range) });
+    cursor.setDate(cursor.getDate() + 1);
   }
-
-  return raw.map(b => ({ left: b.start, width: b.end - b.start, color: b.color }));
+  return bands;
 }
 
 function computeRange(view: HorizonView, today: Date, now: Date = today): Range {
@@ -487,12 +474,12 @@ export function HorizonTimeline({ spans, onAddSpan, eventBars = [] }: Props) {
         onMouseDown={handleMouseDown}
       >
 
-        {/* Day bands (week view) — atmospheric color fills for non-night periods */}
+        {/* Day bands (week view) — subtle light fill for daytime hours */}
         {dayBands.map((band, i) => (
           <div
             key={`db-${i}`}
             className="ht-day-band"
-            style={{ left: `${band.left}%`, width: `${band.width}%`, background: band.color }}
+            style={{ left: `${band.left}%`, width: `${band.width}%` }}
           />
         ))}
 

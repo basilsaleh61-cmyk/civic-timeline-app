@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { blockColors, urgencyColors } from "../theme.js";
 
 const task = blockColors.task;
@@ -92,6 +92,11 @@ function SectionHeader({ label, count, urgency, open, onToggle, onAdd }) {
 function InlineAddRow({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [deadline, setDeadline] = useState("");
+  const rowRef = useRef(null);
+
+  useEffect(() => {
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   function submit() {
     if (!name.trim()) return;
@@ -101,7 +106,7 @@ function InlineAddRow({ onAdd, onCancel }) {
   }
 
   return (
-    <div style={{ display: "flex", gap: "6px", padding: "6px 4px", alignItems: "center" }}>
+    <div ref={rowRef} style={{ display: "flex", gap: "6px", padding: "6px 4px", alignItems: "center" }}>
       <input
         autoFocus
         value={name}

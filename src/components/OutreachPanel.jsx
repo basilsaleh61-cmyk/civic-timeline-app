@@ -114,6 +114,11 @@ function SectionHeader({ section, count, open, onToggle, onAdd, dragOver }) {
 function InlineAddRow({ onAdd, onCancel }) {
   const [person, setPerson] = useState("");
   const [context, setContext] = useState("");
+  const rowRef = useRef(null);
+
+  useEffect(() => {
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   function submit() {
     if (!person.trim()) return;
@@ -122,7 +127,7 @@ function InlineAddRow({ onAdd, onCancel }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "6px 4px" }}>
+    <div ref={rowRef} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "6px 4px" }}>
       <input
         autoFocus
         value={person}
