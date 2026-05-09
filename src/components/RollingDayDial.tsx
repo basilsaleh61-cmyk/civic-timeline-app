@@ -16,20 +16,36 @@ const MIN_DURATION = 15 * 60_000;
 const QUARTER      = 15 * 60_000;
 const HOUR_MS      = 3_600_000;
 
-// ── Sky colour palette ──────────────────────────────────────
-// Simple day/night stops: deep navy night, warm parchment day,
-// with brief golden transitions at dawn and dusk.
+// ── Stepped sky palette ──────────────────────────────────────
+// Colors switch at 15-min tick boundaries (hard-edged bands).
+// Sunrise 6:00–7:00, sunset 18:00–19:00; rest is flat day/night.
 
-export const SKY_STOPS: [number, string][] = [
-  [0,    '#110e28'],  // night navy (matches sidebar)
-  [5,    '#110e28'],  // night navy
-  [6,    '#c4700a'],  // dawn gold
-  [7.5,  '#e8d5b7'],  // daytime parchment
-  [17,   '#e8d5b7'],  // daytime parchment
-  [18.5, '#c4700a'],  // dusk gold
-  [20,   '#110e28'],  // night navy
-  [24,   '#110e28'],  // night navy
-];
+const SUNRISE_H = 6;
+const SUNSET_H  = 18;
+
+const DAY_COLOR   = '#F4EBD8';
+const NIGHT_COLOR = '#342447';
+
+// day → sunset → night  (one entry per 15-min band)
+const SUNSET_BANDS  = ['#F4EBD8', '#EBC9A3', '#CFA3A8', '#8E719E'];
+// night → dawn → day
+const SUNRISE_BANDS = ['#342447', '#5B4A78', '#9A7FA5', '#D7B994'];
+
+export function skyColorAt(hour: number): string {
+  const h    = ((hour % 24) + 24) % 24;
+  const mins = h * 60;
+  const sunriseMins = SUNRISE_H * 60; // 360
+  const sunsetMins  = SUNSET_H  * 60; // 1080
+
+  if (mins >= sunriseMins && mins < sunriseMins + 60)
+    return SUNRISE_BANDS[Math.min(Math.floor((mins - sunriseMins) / 15), 3)];
+  if (mins >= sunriseMins + 60 && mins < sunsetMins) return DAY_COLOR;
+  if (mins >= sunsetMins && mins < sunsetMins + 60)
+    return SUNSET_BANDS[Math.min(Math.floor((mins - sunsetMins) / 15), 3)];
+  return NIGHT_COLOR;
+}
+
+// ── Vignette helpers ──────────────────────────────────────
 
 function parseHex6(hex: string): [number, number, number] {
   return [
@@ -37,27 +53,6 @@ function parseHex6(hex: string): [number, number, number] {
     parseInt(hex.slice(3, 5), 16),
     parseInt(hex.slice(5, 7), 16),
   ];
-}
-
-function lerpColor(c0: string, c1: string, t: number): string {
-  const [r0, g0, b0] = parseHex6(c0);
-  const [r1, g1, b1] = parseHex6(c1);
-  const r = Math.round(r0 + (r1 - r0) * t);
-  const g = Math.round(g0 + (g1 - g0) * t);
-  const b = Math.round(b0 + (b1 - b0) * t);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-export function skyColorAt(hour: number): string {
-  const h = ((hour % 24) + 24) % 24;
-  for (let i = 1; i < SKY_STOPS.length; i++) {
-    if (SKY_STOPS[i][0] > h) {
-      const [t0, c0] = SKY_STOPS[i - 1];
-      const [t1, c1] = SKY_STOPS[i];
-      return lerpColor(c0, c1, (h - t0) / (t1 - t0));
-    }
-  }
-  return SKY_STOPS[SKY_STOPS.length - 1][1];
 }
 
 function darkenToRgba(hex: string, factor: number, alpha: number): string {
@@ -78,16 +73,39 @@ function computeVignetteGradient(topColor: string, botColor: string): string {
   )`;
 }
 
+// ── Stepped dial gradient ─────────────────────────────────
+// Hard-edged color bands aligned to 15-min tick marks.
+
 function computeDialSkyGradient(windowStart: Date, totalHours: number): string {
-  const stops: string[] = [];
-  const step = 0.5; // sample every 30 min for smooth blending
-  for (let h = 0; h <= totalHours; h += step) {
-    const t    = new Date(windowStart.getTime() + h * HOUR_MS);
-    const hour = t.getHours() + t.getMinutes() / 60;
-    const pct  = (h / totalHours) * 100;
-    stops.push(`${skyColorAt(hour)} ${pct.toFixed(1)}%`);
+  const STEP_MS = 15 * 60_000;
+  const totalMs = totalHours * HOUR_MS;
+  const snapMs  = Math.floor(windowStart.getTime() / STEP_MS) * STEP_MS;
+
+  interface Band { color: string; start: number; end: number; }
+  const bands: Band[] = [];
+  let prevColor = '';
+
+  for (let t = snapMs; t < windowStart.getTime() + totalMs; t += STEP_MS) {
+    const d     = new Date(t);
+    const color = skyColorAt(d.getHours() + d.getMinutes() / 60);
+    const startPct = Math.max(0, (t - windowStart.getTime()) / totalMs * 100);
+    const endPct   = Math.min(100, (t + STEP_MS - windowStart.getTime()) / totalMs * 100);
+    if (color !== prevColor) {
+      bands.push({ color, start: startPct, end: endPct });
+      prevColor = color;
+    } else if (bands.length > 0) {
+      bands[bands.length - 1].end = endPct;
+    }
   }
-  return `linear-gradient(to bottom, ${stops.join(', ')})`;
+  if (bands.length > 0) bands[bands.length - 1].end = 100;
+
+  const stops = bands.flatMap(({ color, start, end }) => [
+    `${color} ${start.toFixed(2)}%`,
+    `${color} ${end.toFixed(2)}%`,
+  ]);
+  return stops.length > 0
+    ? `linear-gradient(to bottom, ${stops.join(', ')})`
+    : DAY_COLOR;
 }
 
 // ── Helpers ────────────────────────────────────────────────
