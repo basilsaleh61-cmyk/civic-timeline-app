@@ -358,7 +358,7 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             return (
               <div key={i} className={`hour-row hour-tick--${kind}`} style={{ top: `${topPct}%` }}>
                 <span className="hour-label" style={{ color: lc }}>
-                  {kind === 'hour' && time.getHours() % labelEvery === 0 ? fmtHourLabel(time) : null}
+                  {kind === 'hour' && time.getHours() !== 0 && time.getHours() % labelEvery === 0 ? fmtHourLabel(time) : null}
                 </span>
                 <div className="hour-line" style={{ background: lnC }} />
               </div>

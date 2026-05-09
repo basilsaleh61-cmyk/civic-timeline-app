@@ -421,7 +421,7 @@ body.is-dragging * {
   user-select: none;
 }
 
-.midnight-line { flex: 1; height: 1px; background: rgba(0,0,0,0.30); }
+.midnight-line { flex: 1; height: 2px; background: rgba(0,0,0,0.45); }
 
 /* ── Now playhead ────────────────────────────────────────── */
 
@@ -486,8 +486,8 @@ body.is-dragging * {
 
 .tblock {
   position: absolute;
-  left: 0; right: 0;
-  padding-left: 72px;
+  left: 72px; right: 0;
+  padding-left: 8px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -500,14 +500,14 @@ body.is-dragging * {
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-/* left-margin color stripe extends block hue under the tick labels */
+/* narrow left accent stripe at the tick-line edge */
 .tblock::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 72px;
+  width: 4px;
   background: var(--tc, #888);
-  opacity: 0.38;
+  opacity: 0.65;
   pointer-events: none;
 }
 
