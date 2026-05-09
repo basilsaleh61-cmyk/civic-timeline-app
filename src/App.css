@@ -570,7 +570,7 @@ body.is-dragging * {
   border-right:  1px solid rgba(0,0,0,0.08);
   border-bottom: 1px solid rgba(0,0,0,0.08);
   border-radius: 0 4px 4px 0;
-  z-index: 3;                    /* above tblocks (2), below ticks (4) */
+  z-index: 7;                    /* above ticks (4) and midnights (5), below now-row (14) */
   background: rgba(255,255,255,0.93);
   overflow: hidden;
   pointer-events: none;

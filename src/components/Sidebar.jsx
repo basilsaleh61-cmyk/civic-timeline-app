@@ -211,10 +211,11 @@ export default function Sidebar({
   return (
     <>
       <style>{`
-        .sidebar-scroll::-webkit-scrollbar { width: 3px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: ${theme.scrollThumb}; border-radius: 99px; }
-        .sidebar-scroll { scrollbar-width: thin; scrollbar-color: ${theme.scrollThumb} transparent; }
+        .sidebar-scroll::-webkit-scrollbar { width: 8px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: ${theme.headerBorder}; border-radius: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: ${theme.scrollThumb}; border-radius: 4px; min-height: 40px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: ${theme.dayLabel}; }
+        .sidebar-scroll { scrollbar-width: auto; scrollbar-color: ${theme.scrollThumb} ${theme.headerBorder}; overflow-y: scroll; }
       `}</style>
 
       <div style={{
@@ -232,7 +233,7 @@ export default function Sidebar({
           style={{
             flex: 1,
             minHeight: 0,
-            overflowY: "auto",
+            overflowY: "scroll",
             padding: "14px 14px 24px",
             display: "flex",
             flexDirection: "column",
