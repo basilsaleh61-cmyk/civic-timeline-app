@@ -428,34 +428,36 @@ body.is-dragging * {
 .now-row {
   position: absolute;
   left: 0; right: 0;
-  display: flex;
-  align-items: center;
+  height: 22px;
   pointer-events: none;
-  z-index: 14;              /* above the vignette (z-index 13) — focal plane is always readable */
+  z-index: 99;
   transform: translateY(-50%);
 }
 
-.now-label {
-  width: 72px;
-  flex-shrink: 0;
-  text-align: right;
-  padding-right: 10px;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #C4861A;
-  user-select: none;
-}
-
-.now-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.now-line {
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2.5px;
   background: #C4861A;
-  transform: translateX(-4px);
 }
 
-.now-line { flex: 1; height: 1.5px; background: #C4861A; }
+.now-tab {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #C4861A;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 3px 9px;
+  border-radius: 99px;
+  user-select: none;
+  z-index: 1;
+}
 
 /* ── Hover indicator ────────────────────────────────────── */
 

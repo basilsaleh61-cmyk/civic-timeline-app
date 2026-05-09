@@ -381,11 +381,10 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             );
           })}
 
-          {/* Layer 4: NOW playhead — focal plane, above vignette */}
+          {/* Layer 4: NOW playhead — focal plane, always on top */}
           <div className="now-row" style={{ top: `${nowPct}%` }}>
-            <span className="now-label">NOW</span>
-            <div className="now-dot" />
             <div className="now-line" />
+            <div className="now-tab">NOW</div>
           </div>
 
           {/* Layer 4: hover indicator */}
