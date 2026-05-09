@@ -10,10 +10,7 @@ import { skyColorAt } from "./RollingDayDial";
 
 function getSkyMode() {
   const h = new Date().getHours() + new Date().getMinutes() / 60;
-  if      (h >= 7  && h < 17) return "day";
-  else if ((h >= 6  && h < 7) || (h >= 17 && h < 18)) return "golden";
-  else if (h >= 18 && h < 20) return "dusk";
-  else                         return "night";
+  return (h >= 6 && h < 18) ? "day" : "night";
 }
 
 const SKY_THEMES = {
@@ -26,32 +23,14 @@ const SKY_THEMES = {
     divider:     "#D8CEBC",
     scrollThumb: "#c0b8a8",
   },
-  golden: {
-    sidebar:     "#C88F5A",
-    header:      "#B87E48",
-    headerBorder:"#a06830",
-    dayLabel:    "#6b3a10",
-    dateText:    "#2a1400",
-    divider:     "#a06830",
-    scrollThumb: "#884e18",
-  },
-  dusk: {
-    sidebar:     "#9B6C87",
-    header:      "#8a5c77",
-    headerBorder:"#7a4c67",
-    dayLabel:    "#e8d0e0",
-    dateText:    "#fdf0f8",
-    divider:     "#7a4c67",
-    scrollThumb: "#c090b0",
-  },
   night: {
-    sidebar:     "#342447",
-    header:      "#261836",
-    headerBorder:"#4a3460",
-    dayLabel:    "#8878b0",
-    dateText:    "#e0d8f8",
-    divider:     "#4a3460",
-    scrollThumb: "#6a5490",
+    sidebar:     "#DDD1BC",
+    header:      "#CEC4AE",
+    headerBorder:"#C4BAA4",
+    dayLabel:    "#7a6e5a",
+    dateText:    "#1a1a1a",
+    divider:     "#C4BAA4",
+    scrollThumb: "#b8b0a0",
   },
 };
 
@@ -288,8 +267,8 @@ export default function Sidebar({
               fontSize: "12px",
               fontWeight: 600,
               padding: "6px 14px",
-              backgroundColor: mode === "night" ? "#2a2448" : "#f0ede8",
-              color: mode === "night" ? "#b0a0d8" : "#5f5e5a",
+              backgroundColor: theme.headerBorder,
+              color: theme.dayLabel,
               border: `1px solid ${theme.divider}`,
               borderRadius: "6px",
               cursor: "pointer",
