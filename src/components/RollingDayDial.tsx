@@ -26,10 +26,10 @@ const SUNSET_H  = 18;
 const DAY_COLOR   = '#F4EBD8';
 const NIGHT_COLOR = '#342447';
 
-// day → sunset → night  (one entry per 15-min band)
-const SUNSET_BANDS  = ['#F4EBD8', '#EBC9A3', '#CFA3A8', '#8E719E'];
-// night → dawn → day
-const SUNRISE_BANDS = ['#342447', '#5B4A78', '#9A7FA5', '#D7B994'];
+// day → golden → dusk → night  (one entry per 15-min band)
+const SUNSET_BANDS  = ['#F4EBD8', '#C88F5A', '#9B6C87', '#342447'];
+// night → dusk → golden → day
+const SUNRISE_BANDS = ['#342447', '#9B6C87', '#C88F5A', '#F4EBD8'];
 
 export function skyColorAt(hour: number): string {
   const h    = ((hour % 24) + 24) % 24;
@@ -43,34 +43,6 @@ export function skyColorAt(hour: number): string {
   if (mins >= sunsetMins && mins < sunsetMins + 60)
     return SUNSET_BANDS[Math.min(Math.floor((mins - sunsetMins) / 15), 3)];
   return NIGHT_COLOR;
-}
-
-// ── Vignette helpers ──────────────────────────────────────
-
-function parseHex6(hex: string): [number, number, number] {
-  return [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-}
-
-function darkenToRgba(hex: string, factor: number, alpha: number): string {
-  const [r, g, b] = parseHex6(hex);
-  return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
-}
-
-function computeVignetteGradient(topColor: string, botColor: string): string {
-  return `linear-gradient(to bottom,
-    ${darkenToRgba(topColor, 0.15, 1.00)}  0%,
-    ${darkenToRgba(topColor, 0.25, 0.82)}  8%,
-    ${darkenToRgba(topColor, 0.45, 0.25)} 18%,
-    transparent 26%,
-    transparent 74%,
-    ${darkenToRgba(botColor, 0.45, 0.25)} 82%,
-    ${darkenToRgba(botColor, 0.25, 0.82)} 92%,
-    ${darkenToRgba(botColor, 0.15, 1.00)} 100%
-  )`;
 }
 
 // ── Stepped dial gradient ─────────────────────────────────
@@ -206,8 +178,8 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
   const now      = useRef(new Date()).current;
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // NOW is centred: equal runway above and below.
-  const offsetBefore = 9;
+  // NOW sits ~17% from top: 3 h of past, 15 h of future.
+  const offsetBefore = 3;
   const totalHours   = 18;
   const labelEvery   = 1;
 
@@ -234,13 +206,6 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
     () => computeDialSkyGradient(windowStart, totalHours),
     [windowStart, totalHours]
   );
-
-  // ── Vignette: darken-to-edge-sky-color at top/bottom ────
-  const vignetteStyle = useMemo(() => {
-    const topH = (windowStart.getHours() + windowStart.getMinutes() / 60);
-    const botH = (windowEnd.getHours()   + windowEnd.getMinutes()   / 60);
-    return { background: computeVignetteGradient(skyColorAt(topH), skyColorAt(botH)) };
-  }, [windowStart, windowEnd]);
 
   // ── Drag state ──────────────────────────────────────────
   const dragMetaRef  = useRef<DragMeta | null>(null);
@@ -357,12 +322,9 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
                 block.id === activeId ? 'tblock--active'   : '',
               ].filter(Boolean).join(' ')}
               style={{
-                top:             `${block.topPct}%`,
-                height:          `${block.heightPct}%`,
-                minHeight:       28,
-                transform:       `scaleY(${block.cScale})`,
-                transformOrigin: 'center center',
-                opacity:         block.cOpacity,
+                top:       `${block.topPct}%`,
+                height:    `${block.heightPct}%`,
+                minHeight: 28,
               }}
             >
               <div className="tblock-middle">
@@ -384,9 +346,6 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
                 height:          `${block.heightPct}%`,
                 minHeight:       20,
                 borderLeftColor: block.protocolColor ?? '#7F77DD',
-                transform:       `scaleY(${block.cScale})`,
-                transformOrigin: 'center center',
-                opacity:         block.cOpacity,
               }}
             >
               <span className="event-overlay-title">{block.title}</span>
@@ -394,12 +353,10 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             </div>
           ))}
 
-          {/* Layer 3: tick grid — fully visible ±7 h from NOW, fades in outer 2 h only */}
+          {/* Layer 3: tick grid */}
           {tickMarkers.map(({ topPct, time, kind }, i) => {
-            const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
-            const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
             return (
-              <div key={i} className={`hour-row hour-tick--${kind}`} style={{ top: `${topPct}%`, opacity: op }}>
+              <div key={i} className={`hour-row hour-tick--${kind}`} style={{ top: `${topPct}%` }}>
                 <span className="hour-label">
                   {kind === 'hour' && time.getHours() % labelEvery === 0 ? fmtHourLabel(time) : null}
                 </span>
@@ -410,10 +367,8 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
 
           {/* Layer 3: day boundaries */}
           {midnights.map(({ topPct, date }) => {
-            const dh = Math.abs(topPct - nowPct) / 100 * totalHours;
-            const op = dh <= 7 ? 1 : Math.max(0, 1 - (dh - 7) / 2);
             return (
-              <div key={topPct} className="midnight-row" style={{ top: `${topPct}%`, opacity: op }}>
+              <div key={topPct} className="midnight-row" style={{ top: `${topPct}%` }}>
                 <span className="midnight-label">
                   {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                 </span>
@@ -435,9 +390,6 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
               <span className="dial-hover-tooltip">{fmtTime(hoveredTime)}</span>
             </div>
           )}
-
-          {/* Layer 5: cylinder vignette — darkens to edge sky color at top/bottom */}
-          <div className="dial-vignette" style={vignetteStyle} />
 
         </div>
       </div>
