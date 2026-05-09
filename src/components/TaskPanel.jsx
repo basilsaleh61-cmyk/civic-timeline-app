@@ -276,7 +276,7 @@ export default function TaskPanel({ tasks, onComplete, onAdd, tlTopTaskRef }) {
                   onAdd={() => setAddingIn(k => k === section.key ? null : section.key)}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px" }}>
+                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
                     {sectionTasks.map(t => (
                       <TaskItem key={t.id} t={t} onComplete={handleComplete} animating={animating} />
                     ))}

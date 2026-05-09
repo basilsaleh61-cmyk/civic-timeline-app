@@ -323,7 +323,7 @@ export default function EventPanel({ events, onAdd, onRemove, onUpdate }) {
                   onAdd={() => setAddingIn(k => k === section.key ? null : section.key)}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px" }}>
+                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
                     {sectionEvents.map(event => (
                       <EventItem
                         key={event.id}

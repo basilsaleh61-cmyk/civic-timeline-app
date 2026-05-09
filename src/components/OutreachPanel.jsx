@@ -405,7 +405,7 @@ export default function OutreachPanel({ contacts, onComplete, onAdd, onMove, onU
                   dragOver={dragOver === section.key}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px" }}>
+                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
                     {sectionContacts.map(contact => (
                       <ContactItem
                         key={contact.id}
