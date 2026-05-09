@@ -178,6 +178,14 @@ function EventItem({ event, animating, expanded, onToggle, onSave, onRemove }) {
   const isAnimating = animating.has(event.id);
   const past = isPastToday(event);
   const dotColor = eventColors[event.category]?.dot ?? "#aaa";
+  const isExpanded = expanded === event.id;
+  const detailRef = useRef(null);
+
+  useEffect(() => {
+    if (isExpanded) {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [isExpanded]);
 
   return (
     <div style={{
@@ -203,12 +211,14 @@ function EventItem({ event, animating, expanded, onToggle, onSave, onRemove }) {
         </div>
       </div>
 
-      {expanded === event.id && (
-        <DetailCard
-          event={event}
-          onSave={edits => onSave(event.id, edits)}
-          onRemove={() => onRemove(event.id)}
-        />
+      {isExpanded && (
+        <div ref={detailRef}>
+          <DetailCard
+            event={event}
+            onSave={edits => onSave(event.id, edits)}
+            onRemove={() => onRemove(event.id)}
+          />
+        </div>
       )}
     </div>
   );

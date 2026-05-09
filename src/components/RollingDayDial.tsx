@@ -111,6 +111,16 @@ function asTimeBlock(b: TimeBlock): TimeBlock {
   };
 }
 
+// ── Tick contrast helper ──────────────────────────────────
+// Returns true when the given hex colour is perceptually dark,
+// so callers can choose white vs black ink accordingly.
+function isColorDark(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return r * 0.299 + g * 0.587 + b * 0.114 < 128;
+}
+
 // ── Cylinder projection ────────────────────────────────────
 // Maps distance-from-NOW (hours) to visual scale and opacity.
 // Items at NOW = full size / full opacity; further = compressed + faded.
@@ -353,26 +363,35 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             </div>
           ))}
 
-          {/* Layer 3: tick grid */}
+          {/* Layer 3: tick grid — ink adapts to sky background */}
           {tickMarkers.map(({ topPct, time, kind }, i) => {
+            const bg   = skyColorAt(time.getHours() + time.getMinutes() / 60);
+            const dark = isColorDark(bg);
+            const lc   = dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.55)';
+            const la   = kind === 'hour' ? 0.28 : kind === 'half' ? 0.14 : 0.07;
+            const lnC  = dark ? `rgba(255,255,255,${la * 1.15})` : `rgba(0,0,0,${la})`;
             return (
               <div key={i} className={`hour-row hour-tick--${kind}`} style={{ top: `${topPct}%` }}>
-                <span className="hour-label">
+                <span className="hour-label" style={{ color: lc }}>
                   {kind === 'hour' && time.getHours() % labelEvery === 0 ? fmtHourLabel(time) : null}
                 </span>
-                <div className="hour-line" />
+                <div className="hour-line" style={{ background: lnC }} />
               </div>
             );
           })}
 
           {/* Layer 3: day boundaries */}
           {midnights.map(({ topPct, date }) => {
+            const bg   = skyColorAt(0); // midnight is always night
+            const dark = isColorDark(bg);
+            const lc   = dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.65)';
+            const lnC  = dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
             return (
               <div key={topPct} className="midnight-row" style={{ top: `${topPct}%` }}>
-                <span className="midnight-label">
+                <span className="midnight-label" style={{ color: lc }}>
                   {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                 </span>
-                <div className="midnight-line" />
+                <div className="midnight-line" style={{ background: lnC }} />
               </div>
             );
           })}

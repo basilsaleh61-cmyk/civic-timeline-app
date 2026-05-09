@@ -235,6 +235,13 @@ function DetailCard({ contact, onSave }) {
 function ContactItem({ contact, onComplete, animating, expanded, onToggleExpand, onSave, onDragStart, onDragEnd }) {
   const isAnimating = animating.has(contact.id);
   const isExpanded = expanded === contact.id;
+  const detailRef = useRef(null);
+
+  useEffect(() => {
+    if (isExpanded) {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [isExpanded]);
 
   return (
     <div
@@ -281,7 +288,9 @@ function ContactItem({ contact, onComplete, animating, expanded, onToggleExpand,
       </div>
 
       {isExpanded && (
-        <DetailCard contact={contact} onSave={edits => onSave(contact.id, edits)} />
+        <div ref={detailRef}>
+          <DetailCard contact={contact} onSave={edits => onSave(contact.id, edits)} />
+        </div>
       )}
     </div>
   );

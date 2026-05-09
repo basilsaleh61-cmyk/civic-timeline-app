@@ -295,6 +295,10 @@ export default function App() {
       <HorizonTimeline spans={spans} onAddSpan={addSpan} eventBars={horizonEventBars} />
 
       <div className="app-body">
+        <div className="app-dial">
+          <RollingDayDial blocks={blocks} onUpdate={updateBlock} />
+        </div>
+
         <div className="app-panel">
           <Sidebar
             outcome={outcome}
@@ -327,10 +331,6 @@ export default function App() {
             onDeleteProtocol={deleteProtocol}
             onAddProtocol={addProtocol}
           />
-        </div>
-
-        <div className="app-dial">
-          <RollingDayDial blocks={blocks} onUpdate={updateBlock} />
         </div>
       </div>
 
