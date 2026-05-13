@@ -163,13 +163,17 @@ type TickKind = 'hour' | 'half' | 'quarter';
 interface TickMark { topPct: number; time: Date; kind: TickKind; }
 
 interface Props {
-  blocks:   TimeBlock[];
-  onUpdate: (block: TimeBlock) => void;
+  blocks:         TimeBlock[];
+  onUpdate:       (block: TimeBlock) => void;
+  onUpdateEvent?: (id: string, changes: { name?: string; time?: string; duration?: number }) => void;
+  onRemoveEvent?: (id: string) => void;
 }
+
+interface EventEditState { name: string; time: string; duration: string; }
 
 // ── Component ───────────────────────────────────────────────
 
-export function RollingDayDial({ blocks, onUpdate }: Props) {
+export function RollingDayDial({ blocks, onUpdate, onUpdateEvent, onRemoveEvent }: Props) {
   const now      = useRef(new Date()).current;
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -205,9 +209,11 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
   // ── Drag state ──────────────────────────────────────────
   const dragMetaRef  = useRef<DragMeta | null>(null);
   const liveBlockRef = useRef<TimeBlock | null>(null);
-  const [liveBlock,   setLiveBlock  ] = useState<TimeBlock | null>(null);
-  const [activeId,    setActiveId   ] = useState<string | null>(null);
-  const [hoveredTime, setHoveredTime] = useState<Date | null>(null);
+  const [liveBlock,     setLiveBlock    ] = useState<TimeBlock | null>(null);
+  const [activeId,      setActiveId     ] = useState<string | null>(null);
+  const [hoveredTime,   setHoveredTime  ] = useState<Date | null>(null);
+  const [selectedEvtId, setSelectedEvtId] = useState<string | null>(null);
+  const [evtEdit,       setEvtEdit      ] = useState<EventEditState | null>(null);
 
   function startDrag(kind: DragKind, raw: TimeBlock, e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
@@ -241,6 +247,35 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
     setHoveredTime(roundToNearest15(yToTime(e.clientY)));
   }
   function handleTrackMouseLeave() { setHoveredTime(null); }
+
+  function handleEventClick(block: ProcessedBlock, e: React.MouseEvent) {
+    e.stopPropagation();
+    const origId = block.id.replace(/^evt-/, '');
+    if (selectedEvtId === origId) { setSelectedEvtId(null); setEvtEdit(null); return; }
+    const hh  = String(block.start.getHours()).padStart(2, '0');
+    const mm  = String(block.start.getMinutes()).padStart(2, '0');
+    const dur = Math.round((block.end.getTime() - block.start.getTime()) / 60_000);
+    setSelectedEvtId(origId);
+    setEvtEdit({ name: block.title, time: `${hh}:${mm}`, duration: String(dur) });
+  }
+
+  function handleSaveEvent() {
+    if (!selectedEvtId || !evtEdit) return;
+    onUpdateEvent?.(selectedEvtId, {
+      name:     evtEdit.name,
+      time:     evtEdit.time,
+      duration: parseInt(evtEdit.duration, 10) || 60,
+    });
+    setSelectedEvtId(null); setEvtEdit(null);
+  }
+
+  function handleDeleteEvent() {
+    if (!selectedEvtId) return;
+    onRemoveEvent?.(selectedEvtId);
+    setSelectedEvtId(null); setEvtEdit(null);
+  }
+
+  function dismissPopup() { setSelectedEvtId(null); setEvtEdit(null); }
 
   const displayBlocks = useMemo(() => {
     if (!liveBlock) return blocks;
@@ -302,6 +337,7 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
           style={{ background: skyGradient }}
           onMouseMove={handleTrackMouseMove}
           onMouseLeave={handleTrackMouseLeave}
+          onClick={dismissPopup}
         >
 
           {/* Layer 0: construction paper grain overlay */}
@@ -331,22 +367,66 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
             </div>
           ))}
 
-          {/* Layer 2: event cards — opaque, behind ticks, not interactive */}
-          {processed.filter(b => b.isEvent).map(block => (
-            <div
-              key={block.id}
-              className="event-overlay"
-              style={{
-                top:             `${block.topPct}%`,
-                height:          `${block.heightPct}%`,
-                minHeight:       20,
-                borderLeftColor: block.protocolColor ?? '#7F77DD',
-              }}
-            >
-              <span className="event-overlay-title">{block.title}</span>
-              <span className="event-overlay-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
-            </div>
-          ))}
+          {/* Layer 2: event cards — clickable to edit */}
+          {processed.filter(b => b.isEvent).map(block => {
+            const origId = block.id.replace(/^evt-/, '');
+            const isSelected = selectedEvtId === origId;
+            const color = block.protocolColor ?? '#7F77DD';
+            return (
+              <div
+                key={block.id}
+                className="event-overlay"
+                style={{
+                  top:             `${block.topPct}%`,
+                  height:          `${block.heightPct}%`,
+                  minHeight:       20,
+                  borderLeftColor: color,
+                  pointerEvents:   'auto',
+                  cursor:          'pointer',
+                  outline:         isSelected ? `2px solid ${color}` : 'none',
+                  outlineOffset:   1,
+                }}
+                onClick={e => handleEventClick(block, e)}
+              >
+                <span className="event-overlay-title">{block.title}</span>
+                <span className="event-overlay-time">{fmtTime(block.start)} – {fmtTime(block.end)}</span>
+              </div>
+            );
+          })}
+
+          {/* Event edit popup */}
+          {selectedEvtId && evtEdit && (() => {
+            const selBlock = processed.find(b => b.id.replace(/^evt-/, '') === selectedEvtId);
+            const popupTop = selBlock ? Math.min(Math.max(selBlock.topPct, 2), 65) : 30;
+            const inp: React.CSSProperties = { width: '100%', fontSize: 12, padding: '4px 6px', border: '1px solid #ddd', borderRadius: 4, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' };
+            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#888', marginBottom: 2, display: 'block' };
+            return (
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{ position: 'absolute', top: `${popupTop}%`, right: 8, width: 210, zIndex: 30, backgroundColor: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'auto' }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#444' }}>Edit Event</div>
+                <label><span style={lbl}>Name</span>
+                  <input autoFocus style={inp} value={evtEdit.name}
+                    onChange={e => setEvtEdit(p => p ? { ...p, name: e.target.value } : p)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveEvent(); if (e.key === 'Escape') dismissPopup(); }} />
+                </label>
+                <label><span style={lbl}>Time</span>
+                  <input type="time" style={inp} value={evtEdit.time}
+                    onChange={e => setEvtEdit(p => p ? { ...p, time: e.target.value } : p)} />
+                </label>
+                <label><span style={lbl}>Duration (min)</span>
+                  <input type="number" style={inp} value={evtEdit.duration} min={5} step={5}
+                    onChange={e => setEvtEdit(p => p ? { ...p, duration: e.target.value } : p)} />
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={handleDeleteEvent} style={{ flex: 1, fontSize: 12, padding: '5px 0', backgroundColor: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>
+                  <button onClick={handleSaveEvent} style={{ flex: 1, fontSize: 12, padding: '5px 0', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Save</button>
+                </div>
+                <button onClick={dismissPopup} style={{ fontSize: 10, background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0, textAlign: 'right', fontFamily: 'inherit' }}>cancel</button>
+              </div>
+            );
+          })()}
 
           {/* Layer 3: tick grid — ink adapts to sky background */}
           {tickMarkers.map(({ topPct, time, kind }, i) => {

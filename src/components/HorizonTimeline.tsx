@@ -295,14 +295,21 @@ function computeHorizonNightBands(view: HorizonView, range: Range): HorizonNight
 
 // ── Component ──────────────────────────────────────────────
 
+const EVT_CATEGORIES = ['work', 'collab', 'networking', 'music', 'social'] as const;
+type EvtCategory = typeof EVT_CATEGORIES[number];
+const EVT_COLOR_MAP: Record<EvtCategory, string> = {
+  work: '#7F77DD', collab: '#D4537E', networking: '#BA7517', music: '#639922', social: '#D85A30',
+};
+
 interface Props {
-  spans:               HorizonSpan[];
-  onAddSpan:           (span: HorizonSpan) => void;
+  spans?:              HorizonSpan[];
+  onAddSpan?:          (span: HorizonSpan) => void;
   blocks?:             TimeBlock[];
   onUpdateEventTime?:  (id: string, start: Date, end: Date) => void;
+  onAddEvent?:         (data: { name: string; time: string; date: string; category: string; section: string; duration: number }) => void;
 }
 
-export function HorizonTimeline({ blocks = [], onUpdateEventTime }: Props) {
+export function HorizonTimeline({ blocks = [], onUpdateEventTime, onAddEvent }: Props) {
   const [view, setView] = useState<HorizonView>('month');
   const [now,  setNow ] = useState(() => new Date());
 
@@ -364,6 +371,46 @@ export function HorizonTimeline({ blocks = [], onUpdateEventTime }: Props) {
         return { ...b, color: b.protocolColor ?? '#7F77DD', leftPct, widthPct: Math.max(rightPct - leftPct, 0.3) };
       });
   }, [blocks, range]);
+
+  // ── Hover + click-to-add (week view only) ──────────────
+  const [hoveredTime,  setHoveredTime ] = useState<Date | null>(null);
+  const [clickedTime,  setClickedTime ] = useState<Date | null>(null);
+  const [evtName,      setEvtName     ] = useState('');
+  const [evtDuration,  setEvtDuration ] = useState('60');
+  const [evtCategory,  setEvtCategory ] = useState<EvtCategory>('work');
+
+  function xToSnappedTime(clientX: number): Date | null {
+    const rect = rulerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const ms  = pctToMs(pct * 100, rangeRef.current);
+    return new Date(Math.round(ms / (15 * 60_000)) * (15 * 60_000));
+  }
+
+  function handleRulerMouseMove(e: React.MouseEvent) {
+    if (view !== 'week' || clickedTime) return;
+    setHoveredTime(xToSnappedTime(e.clientX));
+  }
+  function handleRulerMouseLeave() { if (!clickedTime) setHoveredTime(null); }
+  function handleRulerClick(e: React.MouseEvent) {
+    if (view !== 'week') return;
+    const t = xToSnappedTime(e.clientX);
+    if (!t) return;
+    setClickedTime(t);
+    setHoveredTime(null);
+    setEvtName('');
+    setEvtDuration('60');
+    setEvtCategory('work');
+  }
+  function submitEventForm(e: React.FormEvent) {
+    e.preventDefault();
+    if (!clickedTime || !evtName.trim()) return;
+    const hh   = String(clickedTime.getHours()).padStart(2, '0');
+    const mm   = String(clickedTime.getMinutes()).padStart(2, '0');
+    const date = `${clickedTime.getFullYear()}-${String(clickedTime.getMonth()+1).padStart(2,'0')}-${String(clickedTime.getDate()).padStart(2,'0')}`;
+    onAddEvent?.({ name: evtName.trim(), time: `${hh}:${mm}`, date, category: evtCategory, section: 'today', duration: parseInt(evtDuration,10)||60 });
+    setClickedTime(null);
+  }
 
   // ── Event bar drag ──────────────────────────────────────
   const [activeEvtId, setActiveEvtId] = useState<string | null>(null);
@@ -435,7 +482,10 @@ export function HorizonTimeline({ blocks = [], onUpdateEventTime }: Props) {
       <div
         ref={rulerRef}
         className="ht-ruler"
-        style={{ height: totalHeight }}
+        style={{ height: totalHeight, cursor: view === 'week' ? 'crosshair' : 'default' }}
+        onMouseMove={handleRulerMouseMove}
+        onMouseLeave={handleRulerMouseLeave}
+        onClick={handleRulerClick}
       >
 
         {/* Day bands (week view) */}
@@ -507,7 +557,56 @@ export function HorizonTimeline({ blocks = [], onUpdateEventTime }: Props) {
           </div>
         )}
 
+        {/* Hover band + tooltip (week view) */}
+        {view === 'week' && hoveredTime && !clickedTime && (() => {
+          const hPct = toPct(hoveredTime, range);
+          const dur1h = toPct(new Date(hoveredTime.getTime() + HOUR_MS), range);
+          const bandW = Math.max(dur1h - hPct, 0);
+          const h = hoveredTime.getHours(), m = hoveredTime.getMinutes();
+          const label = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+          return (
+            <>
+              <div style={{ position: 'absolute', left: `${hPct}%`, width: `${bandW}%`, top: 0, bottom: 0, background: 'rgba(0,0,0,0.08)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: `${hPct}%`, top: 2, transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, pointerEvents: 'none', whiteSpace: 'nowrap' }}>{label}</div>
+            </>
+          );
+        })()}
+
       </div>
+
+      {/* Quick-add event form (week view, appears below ruler when clicked) */}
+      {view === 'week' && clickedTime && (() => {
+        const h = clickedTime.getHours(), m = clickedTime.getMinutes();
+        const timeLabel = `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+        return (
+          <form onSubmit={submitEventForm} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'rgba(0,0,0,0.04)', borderTop: '1px solid rgba(0,0,0,0.08)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#555', whiteSpace: 'nowrap' }}>New event · {timeLabel}</span>
+            <input
+              autoFocus
+              value={evtName}
+              onChange={e => setEvtName(e.target.value)}
+              placeholder="Event name…"
+              style={{ fontSize: 12, padding: '4px 8px', border: '1px solid #ccc', borderRadius: 4, outline: 'none', flex: '1 1 140px', minWidth: 100 }}
+            />
+            <input
+              type="number"
+              value={evtDuration}
+              onChange={e => setEvtDuration(e.target.value)}
+              min={5} step={5}
+              title="Duration (min)"
+              style={{ fontSize: 12, padding: '4px 6px', border: '1px solid #ccc', borderRadius: 4, outline: 'none', width: 64 }}
+            />
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              {EVT_CATEGORIES.map(cat => (
+                <button key={cat} type="button" title={cat} onClick={() => setEvtCategory(cat)}
+                  style={{ width: evtCategory === cat ? 16 : 11, height: evtCategory === cat ? 16 : 11, borderRadius: '50%', background: EVT_COLOR_MAP[cat], border: evtCategory === cat ? '2px solid #333' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0, transition: 'all 0.12s' }} />
+              ))}
+            </div>
+            <button type="submit" style={{ fontSize: 12, padding: '4px 12px', background: EVT_COLOR_MAP[evtCategory], color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Add</button>
+            <button type="button" onClick={() => setClickedTime(null)} style={{ fontSize: 12, padding: '4px 10px', background: 'none', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', color: '#666' }}>Cancel</button>
+          </form>
+        );
+      })()}
 
     </div>
   );

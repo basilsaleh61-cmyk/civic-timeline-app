@@ -304,11 +304,11 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="app">
-      <HorizonTimeline spans={spans} onAddSpan={addSpan} blocks={blocks} onUpdateEventTime={handleUpdateEventTime} />
+      <HorizonTimeline spans={spans} onAddSpan={addSpan} blocks={blocks} onUpdateEventTime={handleUpdateEventTime} onAddEvent={handleAddEvent} />
 
       <div className="app-body">
         <div className="app-dial">
-          <RollingDayDial blocks={blocks} onUpdate={updateBlock} />
+          <RollingDayDial blocks={blocks} onUpdate={updateBlock} onUpdateEvent={handleUpdateEvent} onRemoveEvent={handleRemoveEvent} />
         </div>
 
         <div className="app-panel" style={{ width: editOpen ? 440 : 52 }}>
