@@ -174,7 +174,7 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   // NOW centred: 9 h before, 9 h after.
-  const offsetBefore = 9;
+  const offsetBefore = 1.75;
   const totalHours   = 18;
   const labelEvery   = 1;
 
@@ -384,7 +384,7 @@ export function RollingDayDial({ blocks, onUpdate }: Props) {
           {/* Layer 4: NOW playhead — focal plane, always on top */}
           <div className="now-row" style={{ top: `${nowPct}%` }}>
             <div className="now-line" />
-            <div className="now-tab">NOW</div>
+            <div className="now-tab">{fmtTime(now)}</div>
           </div>
 
           {/* Layer 4: hover indicator */}

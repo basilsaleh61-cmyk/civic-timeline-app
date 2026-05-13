@@ -582,7 +582,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
           />
         ))}
 
-        {/* Protocol strips — week view only, translucent, at the base of the band */}
+        {/* Protocol strips — week view only, translucent, pinned to base */}
         {protoStrips.map(s => (
           <div
             key={s.id}
@@ -590,7 +590,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
             style={{
               left:       `${s.leftPct}%`,
               width:      `${s.widthPct}%`,
-              top:        AXIS_TOP + EVT_H,
+              bottom:     0,
               height:     PROTO_H,
               background: s.color + '55',
             }}
@@ -605,7 +605,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
             style={{
               left:       `${bar.leftPct}%`,
               width:      `${bar.widthPct}%`,
-              top:        AXIS_TOP,
+              bottom:     PROTO_H,
               height:     EVT_H,
               background: bar.color,
             }}
