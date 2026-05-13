@@ -192,7 +192,7 @@ function TaskItem({ t, onComplete, animating }) {
 }
 
 export default function TaskPanel({ tasks, onComplete, onAdd, tlTopTaskRef }) {
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [openSections, setOpenSections] = useState(
     Object.fromEntries(SECTIONS.map(s => [s.key, false]))
   );
@@ -276,7 +276,7 @@ export default function TaskPanel({ tasks, onComplete, onAdd, tlTopTaskRef }) {
                   onAdd={() => setAddingIn(k => k === section.key ? null : section.key)}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
+                  <div style={{ paddingLeft: "4px" }}>
                     {sectionTasks.map(t => (
                       <TaskItem key={t.id} t={t} onComplete={handleComplete} animating={animating} />
                     ))}

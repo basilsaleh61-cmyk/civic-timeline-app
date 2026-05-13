@@ -115,6 +115,8 @@ function LegendBar() {
 // ── App ───────────────────────────────────────────────────────
 
 export default function App() {
+  const [editOpen, setEditOpen] = useState(false);
+
   // ── Horizon state ─────────────────────────────────────────
   const [spans, setSpans] = useState([]);
 
@@ -309,8 +311,11 @@ export default function App() {
           <RollingDayDial blocks={blocks} onUpdate={updateBlock} />
         </div>
 
-        <div className="app-panel">
+        <div className="app-panel" style={{ width: editOpen ? 440 : 52 }}>
           <Sidebar
+            editOpen={editOpen}
+            onOpenEdit={() => setEditOpen(true)}
+            onCloseEdit={() => setEditOpen(false)}
             outcome={outcome}
             onResolve={handleResolveOutcome}
             onSetText={handleSetOutcomeText}

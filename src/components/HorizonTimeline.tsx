@@ -295,13 +295,6 @@ function computeHorizonNightBands(view: HorizonView, range: Range): HorizonNight
 
 // ── Component ──────────────────────────────────────────────
 
-interface FormState {
-  title:     string;
-  startDate: string; // YYYY-MM-DD
-  endDate:   string;
-  color:     string;
-}
-
 interface Props {
   spans:               HorizonSpan[];
   onAddSpan:           (span: HorizonSpan) => void;
@@ -309,7 +302,7 @@ interface Props {
   onUpdateEventTime?:  (id: string, start: Date, end: Date) => void;
 }
 
-export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTime }: Props) {
+export function HorizonTimeline({ blocks = [], onUpdateEventTime }: Props) {
   const [view, setView] = useState<HorizonView>('month');
   const [now,  setNow ] = useState(() => new Date());
 
@@ -324,9 +317,17 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
 
   const range    = useMemo(() => computeRange(view, today, now), [view, today, now]);
   const notches  = useMemo(() => computeNotches(view, range), [view, range]);
-  const placed   = useMemo(() => placeSpans(spans, range), [spans, range]);
   const dayBands = useMemo(() => computeHorizonDayBands(view, range), [view, range]);
-  // Protocol strips — non-event blocks projected across every day in the week window
+
+  // Fixed height — no vertical expansion
+  const totalHeight = AXIS_TOP + BAND_H;
+
+  // ── Refs ────────────────────────────────────────────────
+  const rulerRef   = useRef<HTMLDivElement>(null);
+  const rangeRef   = useRef(range);
+  rangeRef.current = range;
+
+  // Protocol strips — week view only
   const protoStrips = useMemo(() => {
     if (view !== 'week') return [];
     const result: Array<{ id: string; color: string; leftPct: number; widthPct: number }> = [];
@@ -353,7 +354,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
     return result;
   }, [blocks, range, view]);
 
-  // Event bars — isEvent blocks, with live-drag override
+  // Event bars — week view only, with live-drag override
   const placedEventBars = useMemo(() => {
     return blocks
       .filter(b => b.isEvent && b.end > range.start && b.start < range.end)
@@ -364,28 +365,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
       });
   }, [blocks, range]);
 
-  const numSpanRows = placed.length === 0 ? 0 : Math.max(...placed.map(s => s.row)) + 1;
-  const totalHeight = AXIS_TOP + BAND_H + (numSpanRows > 0 ? numSpanRows * (SPAN_H + SPAN_GAP) + 8 : 8);
-
-  // ── Refs ────────────────────────────────────────────────
-  const rulerRef     = useRef<HTMLDivElement>(null);
-  const rangeRef     = useRef(range);
-  const viewRef      = useRef(view);
-  const dragStartRef = useRef<Date | null>(null);
-  const dragEndRef   = useRef<Date | null>(null);
-  rangeRef.current   = range; // always current; used inside effect closures
-  viewRef.current    = view;
-
-  // ── Interaction state ───────────────────────────────────
-  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
-  const [isDragging,  setIsDragging ] = useState(false);
-  const [selBand,     setSelBand    ] = useState<{ left: number; right: number } | null>(null);
-  const [showForm,    setShowForm   ] = useState(false);
-  const [form,        setForm       ] = useState<FormState>({
-    title: '', startDate: '', endDate: '', color: SPAN_COLORS[0],
-  });
-
-  // ── Event bar drag state ────────────────────────────────
+  // ── Event bar drag ──────────────────────────────────────
   const [activeEvtId, setActiveEvtId] = useState<string | null>(null);
   const [liveEvt,     setLiveEvt    ] = useState<{ id: string; start: Date; end: Date } | null>(null);
   const liveEvtRef = useRef<typeof liveEvt>(null);
@@ -401,7 +381,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
     e.preventDefault(); e.stopPropagation();
     const rect = rulerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const rangeMs  = range.end.getTime() - range.start.getTime();
+    const rangeMs   = range.end.getTime() - range.start.getTime();
     const origStart = bar.start, origEnd = bar.end;
     const startX    = e.clientX;
     const SNAP      = 15 * 60_000;
@@ -429,118 +409,6 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
     document.addEventListener('mouseup', onUp);
   }
 
-  // ── x-position → view-aware snapped time unit ───────────
-  // Week view snaps to the nearest hour; all other views snap to
-  // the nearest day. Both refs update every render so closures
-  // inside effects always read the freshest values.
-  function clientXToUnit(clientX: number): Date | null {
-    const el = rulerRef.current;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    const pct  = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-    const ms   = pctToMs(pct, rangeRef.current);
-    return viewRef.current === 'week' ? snapToHour(ms) : snapToDay(ms);
-  }
-
-  // ── Document-level drag listeners ──────────────────────
-  useEffect(() => {
-    if (!isDragging) return;
-
-    function onMove(e: MouseEvent) {
-      const d = clientXToUnit(e.clientX);
-      if (!d || !dragStartRef.current) return;
-      dragEndRef.current = d;
-      setHoveredDate(d);
-      const r      = rangeRef.current;
-      const unitMs = viewRef.current === 'week' ? HOUR_MS : DAY_MS;
-      const s      = dragStartRef.current <= d ? dragStartRef.current : d;
-      const en     = dragStartRef.current <= d ? d : dragStartRef.current;
-      setSelBand({ left: toPct(s, r), right: toPct(new Date(en.getTime() + unitMs), r) });
-    }
-
-    function onUp() {
-      const start  = dragStartRef.current;
-      const end    = dragEndRef.current ?? start;
-      dragStartRef.current = null;
-      dragEndRef.current   = null;
-      setIsDragging(false);
-      setSelBand(null);
-      setHoveredDate(null);
-
-      if (start) {
-        const s      = !end || start <= end ? start : end;
-        const en     = !end || start <= end ? end ?? start : start;
-        const isWeek = viewRef.current === 'week';
-        const unitMs = isWeek ? HOUR_MS : DAY_MS;
-        setForm({
-          title:     '',
-          startDate: isWeek ? dateToInputDT(s)                          : dateToInput(s),
-          endDate:   isWeek ? dateToInputDT(new Date(en.getTime() + unitMs))
-                            : dateToInput(new Date(en.getTime() + DAY_MS)),
-          color:     SPAN_COLORS[0],
-        });
-        setShowForm(true);
-      }
-    }
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
-    };
-  }, [isDragging]);
-
-  // ── React event handlers ────────────────────────────────
-
-  function handleMouseMove(e: React.MouseEvent) {
-    if (isDragging) return; // handled by document listener
-    setHoveredDate(clientXToUnit(e.clientX));
-  }
-
-  function handleMouseLeave() {
-    if (!isDragging) setHoveredDate(null);
-  }
-
-  function handleMouseDown(e: React.MouseEvent) {
-    if (e.button !== 0) return;
-    const d = clientXToUnit(e.clientX);
-    if (!d) return;
-    e.preventDefault(); // prevent text selection on drag
-    dragStartRef.current = d;
-    dragEndRef.current   = d;
-    setIsDragging(true);
-    setHoveredDate(d);
-  }
-
-  // ── Form ────────────────────────────────────────────────
-
-  function submitForm(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.title.trim() || !form.startDate || !form.endDate) return;
-    onAddSpan({
-      id:    crypto.randomUUID(),
-      title: form.title.trim(),
-      start: inputToDateAny(form.startDate),
-      end:   inputToDateAny(form.endDate),
-      color: form.color,
-    });
-    setShowForm(false);
-    setForm({ title: '', startDate: '', endDate: '', color: SPAN_COLORS[0] });
-  }
-
-  // ── Derived hover visuals ───────────────────────────────
-
-  const hoverBand = useMemo(() => {
-    if (!hoveredDate || isDragging) return null;
-    const unitMs = view === 'week' ? HOUR_MS : DAY_MS;
-    const left   = toPct(hoveredDate, range);
-    const right  = toPct(new Date(hoveredDate.getTime() + unitMs), range);
-    return { left, width: right - left };
-  }, [hoveredDate, isDragging, range, view]);
-
-  const hovPct = hoveredDate ? toPct(hoveredDate, range) : 0;
-
   // ── Render ──────────────────────────────────────────────
 
   return (
@@ -563,17 +431,14 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
         </div>
       </div>
 
-      {/* Full-width ruler — no scroll */}
+      {/* Full-width ruler — fixed height */}
       <div
         ref={rulerRef}
-        className={`ht-ruler${isDragging ? ' ht-ruler--dragging' : ''}`}
+        className="ht-ruler"
         style={{ height: totalHeight }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onMouseDown={handleMouseDown}
       >
 
-        {/* Day bands (week view) — atmospheric colors on dark night base */}
+        {/* Day bands (week view) */}
         {dayBands.map((band, i) => (
           <div
             key={`db-${i}`}
@@ -597,8 +462,8 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
           />
         ))}
 
-        {/* Event bars — opaque, sit above protocol strips, draggable */}
-        {displayEventBars.map(bar => (
+        {/* Event bars — week view only, opaque, draggable */}
+        {view === 'week' && displayEventBars.map(bar => (
           <div
             key={bar.id}
             className={`ht-event-bar${bar.id === activeEvtId ? ' ht-event-bar--active' : ''}`}
@@ -632,7 +497,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
         {/* Left-edge origin marker */}
         <div className="ht-today-marker" />
 
-        {/* NOW marker — floats in m/s/y views; week view starts at NOW so no float needed */}
+        {/* NOW marker — floats in m/s/y views */}
         {view !== 'week' && (
           <div
             className="ht-now-marker"
@@ -642,129 +507,7 @@ export function HorizonTimeline({ spans, onAddSpan, blocks = [], onUpdateEventTi
           </div>
         )}
 
-        {/* Hover highlight band (single day) */}
-        {hoverBand && (
-          <div
-            className="ht-hover-band"
-            style={{ left: `${hoverBand.left}%`, width: `${hoverBand.width}%` }}
-          />
-        )}
-
-        {/* Hover date tooltip */}
-        {hoveredDate && !isDragging && (
-          <div
-            className="ht-hover-tooltip"
-            style={{
-              left:      `${hovPct}%`,
-              transform: hovPct > 70
-                ? 'translateX(calc(-100% - 4px))'
-                : 'translateX(4px)',
-            }}
-          >
-            {view === 'week'
-              ? hoveredDate.toLocaleString('en-US', {
-                  weekday: 'short', month: 'short', day: 'numeric',
-                  hour: 'numeric', hour12: true,
-                })
-              : hoveredDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-            }
-          </div>
-        )}
-
-        {/* Drag selection band */}
-        {selBand && (
-          <div
-            className="ht-sel-band"
-            style={{
-              left:  `${selBand.left}%`,
-              width: `${Math.max(selBand.right - selBand.left, 0)}%`,
-            }}
-          />
-        )}
-
-        {/* Horizon spans, clipped to runway */}
-        {placed.map(span => (
-          <div
-            key={span.id}
-            className="ht-span"
-            style={{
-              left:        `${span.leftPct}%`,
-              width:       `${span.widthPct}%`,
-              top:         AXIS_TOP + BAND_H + span.row * (SPAN_H + SPAN_GAP),
-              height:      SPAN_H,
-              borderColor: span.color,
-              background:  span.color + '18',
-            }}
-            title={`${span.title}\n${span.start.toLocaleDateString()} – ${span.end.toLocaleDateString()}`}
-          >
-            <span className="ht-span-label" style={{ color: span.color }}>{span.title}</span>
-          </div>
-        ))}
-
       </div>
-
-      {/* Add-span form — rendered below ruler when active */}
-      {showForm && (
-        <form className="ht-form" onSubmit={submitForm}>
-
-          <div className="ht-form-header">
-            <span className="ht-form-title">New span</span>
-            <button type="button" className="ht-form-close" onClick={() => setShowForm(false)}>×</button>
-          </div>
-
-          <div className="ht-form-row">
-            <input
-              className="ht-form-input ht-form-input--title"
-              placeholder="Title"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              autoFocus
-            />
-          </div>
-
-          <div className="ht-form-row">
-            <input
-              type={view === 'week' ? 'datetime-local' : 'date'}
-              className={`ht-form-input ht-form-date${view === 'week' ? ' ht-form-date--dt' : ''}`}
-              value={form.startDate}
-              onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-            />
-            <span className="ht-form-sep">→</span>
-            <input
-              type={view === 'week' ? 'datetime-local' : 'date'}
-              className={`ht-form-input ht-form-date${view === 'week' ? ' ht-form-date--dt' : ''}`}
-              value={form.endDate}
-              onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-            />
-          </div>
-
-          <div className="ht-form-row">
-            {SPAN_COLORS.map(c => (
-              <button
-                key={c}
-                type="button"
-                className={`ht-color-swatch${form.color === c ? ' ht-color-swatch--active' : ''}`}
-                style={{ background: c }}
-                onClick={() => setForm(f => ({ ...f, color: c }))}
-              />
-            ))}
-          </div>
-
-          <div className="ht-form-row ht-form-actions">
-            <button
-              type="button"
-              className="ht-form-btn ht-form-btn--cancel"
-              onClick={() => setShowForm(false)}
-            >
-              cancel
-            </button>
-            <button type="submit" className="ht-form-btn ht-form-btn--submit">
-              add span
-            </button>
-          </div>
-
-        </form>
-      )}
 
     </div>
   );

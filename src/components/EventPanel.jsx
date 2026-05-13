@@ -271,7 +271,7 @@ function SectionHeader({ section, count, open, onToggle, onAdd }) {
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function EventPanel({ events, onAdd, onRemove, onUpdate }) {
-  const [panelOpen,    setPanelOpen]    = useState(true);
+  const [panelOpen,    setPanelOpen]    = useState(false);
   const [openSections, setOpenSections] = useState(Object.fromEntries(SECTIONS.map(s => [s.key, false])));
   const [addingIn,     setAddingIn]     = useState(null);
   const [expanded,     setExpanded]     = useState(null);
@@ -323,7 +323,7 @@ export default function EventPanel({ events, onAdd, onRemove, onUpdate }) {
                   onAdd={() => setAddingIn(k => k === section.key ? null : section.key)}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
+                  <div style={{ paddingLeft: "4px" }}>
                     {sectionEvents.map(event => (
                       <EventItem
                         key={event.id}

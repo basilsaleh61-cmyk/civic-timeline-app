@@ -31,13 +31,13 @@ body.is-dragging * {
   min-height: 0;
 }
 
-/* Sidebar — left, fixed width */
+/* Sidebar panel — width driven by inline style (collapsed 52px / edit 440px) */
 .app-panel {
-  width: 260px;
   flex-shrink: 0;
   overflow: hidden;
   border-left: 1px solid #e8e4dd;
   background: #faf9f7;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Day dial — right, takes remaining space */

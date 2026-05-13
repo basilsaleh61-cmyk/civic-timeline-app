@@ -299,7 +299,7 @@ function ContactItem({ contact, onComplete, animating, expanded, onToggleExpand,
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function OutreachPanel({ contacts, onComplete, onAdd, onMove, onUpdate, tlTopOutRef }) {
-  const [panelOpen,    setPanelOpen]    = useState(true);
+  const [panelOpen,    setPanelOpen]    = useState(false);
   const [openSections, setOpenSections] = useState(Object.fromEntries(SECTIONS.map(s => [s.key, false])));
   const [addingIn,     setAddingIn]     = useState(null);
   const [expanded,     setExpanded]     = useState(null);
@@ -405,7 +405,7 @@ export default function OutreachPanel({ contacts, onComplete, onAdd, onMove, onU
                   dragOver={dragOver === section.key}
                 />
                 {isOpen && (
-                  <div style={{ paddingLeft: "4px", maxHeight: 220, overflowY: "auto" }}>
+                  <div style={{ paddingLeft: "4px" }}>
                     {sectionContacts.map(contact => (
                       <ContactItem
                         key={contact.id}
